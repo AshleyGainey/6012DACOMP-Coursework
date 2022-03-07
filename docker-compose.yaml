@@ -1,18 +1,51 @@
-version: '3' 
- 
-services: 
-  node1: 
-    build: ./nodejs 
-    ports: 
-      - "81:3000" 
-  node2: 
-    build: ./nodejs 
-    ports: 
-      - "82:3000" 
-  node3: 
-    build: ./nodejs 
-    ports: 
-      - "83:3000" 
+version: '3'
+services:
+  mongo1:
+    hostname: mongo1
+    container_name: localmongo1
+    image: mongo:4.0-xenial
+    ports:
+      - "40001:27017"
+    restart: always
+    entrypoint: [ "/usr/bin/mongod", "--bind_ip_all", "--replSet", "rs0" ]
+  mongo2:
+    hostname: mongo2
+    container_name: localmongo2
+    image: mongo:4.0-xenial
+    ports:
+      - "40002:27017"
+    restart: always
+    entrypoint: [ "/usr/bin/mongod", "--bind_ip_all", "--replSet", "rs0" ]
+  mongo3:
+    hostname: mongo3
+    container_name: localmongo3
+    image: mongo:4.0-xenial
+    ports:
+      - "40003:27017"
+    restart: always
+    entrypoint: [ "/usr/bin/mongod", "--bind_ip_all", "--replSet", "rs0" ]
+  mongosetup:
+    image: mongo:4.0-xenial
+    depends_on:
+      - mongo1
+      - mongo2
+      - mongo3
+    volumes:
+      - ./scripts:/scripts
+    restart: "no"
+    entrypoint: [ "bash", "/scripts/mongo_setup.sh"]
+  node1:
+    build: ./nodejs
+    ports:
+      - "81:3000"
+  node2:
+    build: ./nodejs
+    ports:
+      - "82:3000"
+  node3:
+    build: ./nodejs
+    ports:
+      - "83:3000"
   nginx: 
     build: ./nginx 
     ports: 
@@ -20,4 +53,4 @@ services:
     depends_on: 
      - node1 
      - node2 
-     - node3 
+     - node3
