@@ -16,7 +16,7 @@ const app = express()
 const port = 3000
 
 //connection string listing the mongo servers. This is an alternative to using a load balancer. THIS SHOULD BE DISCUSSED IN YOUR ASSIGNMENT.
-const connectionString = 'mongodb://localmongo1:27017,localmongo2:27017,localmongo3:27017/sweetShopDB?replicaSet=rs0';
+const connectionString = 'mongodb://localmongo1:27017,localmongo2:27017,localmongo3:27017/notFlixDB?replicaSet=rs0';
 
 setInterval(function() {
 
@@ -36,27 +36,31 @@ db.on('error', console.error.bind(console, 'MongoDB connection error:'));
 
 var Schema = mongoose.Schema;
 
-var stockSchema = new Schema({
-  _id: Number,
-  item: String,
-  price: Number,
-  quantity: Number
+var notFlixSchema = new Schema({
+  _id : Number,
+  accountID: Number,
+  userName: String,
+  titleID: Number,
+  userAction: String,
+  dateAndTime: Date,
+  pointOfInteraction: String,
+  typeOfInteraction: String
 });
 
-var stockModel = mongoose.model('Stock', stockSchema, 'stock');
+var notFlixModel = mongoose.model('Interactions', notFlixSchema, 'interactions');
 
 
 
 app.get('/', (req, res) => {
-  stockModel.find({},'item price quantity lastName', (err, stock) => {
+  notFlixModel.find({},'_id accountID userName titleID userAction dateAndTime pointOfInteraction typeOfInteraction lastName', (err, interactions) => {
     if(err) return handleError(err);
-    res.send(JSON.stringify(stock))
+    res.send(JSON.stringify(interactions))
   }) 
 })
 
 app.post('/',  (req, res) => { 
-  var new_stock_instance = new stockModel(req.body); 
-  new_stock_instance.save(function (err) { 
+  var new_notFlix_instance = new notFlixModel(req.body); 
+  new_notFlix_instance.save(function (err) { 
   if (err) res.send('Error'); 
     res.send(JSON.stringify(req.body)) 
   }); 
