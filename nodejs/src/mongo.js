@@ -11,6 +11,11 @@ const express = require('express')
 //used to parse the server response from json to object.
 const bodyParser = require('body-parser');
 
+const os = require("os");
+var myhostname = os.hostname();
+
+var amqp = require('amqplib/callback_api');
+
 //instance of express and port to use for inbound connections.
 const app = express()
 const port = 3000
@@ -49,8 +54,6 @@ var notFlixSchema = new Schema({
 
 var notFlixModel = mongoose.model('Interactions', notFlixSchema, 'interactions');
 
-
-
 app.get('/', (req, res) => {
   notFlixModel.find({},'_id accountID userName titleID userAction dateAndTime pointOfInteraction typeOfInteraction lastName', (err, interactions) => {
     if(err) return handleError(err);
@@ -79,3 +82,73 @@ app.listen(port, () => {
  console.log(`Express Application listening at port ` + port)
 })
 
+var nodeID = Math.floor(Math.random() * (100 - 1 + 1) + 1);
+toSend = { "hostname": myhostname, "status": "alive", "nodeID": nodeID };
+setInterval(function () {
+  //Publsher Code
+  amqp.connect('amqp://test:test@192.168.56.108', function (error0, connection) {
+    console.log("Sending the alive message. Host Name:" + myhostname + " The Node ID:" + nodeID);
+
+    if (error0) {
+      throw error0;
+    }
+    connection.createChannel(function (error1, channel) {
+      if (error1) {
+        throw error1;
+      }
+
+
+
+      var exchange = 'logs';
+      var msg = toSend;
+
+      channel.assertExchange(exchange, 'fanout', {
+        durable: false
+      });
+      channel.publish(exchange, '', Buffer.from(msg.toString()));
+      console.log(" [x] Sent %s", msg);
+    });
+
+
+    setTimeout(function () {
+      connection.close();
+    }, 500);
+  });
+}, 2000);
+
+//Subscriber Code
+amqp.connect('amqp://test:test@192.168.56.108', function (error0, connection) {
+  console.log("In Subscriber part, awaiting for messages.");
+  if (error0) {
+    throw error0;
+  }
+  connection.createChannel(function (error1, channel) {
+    if (error1) {
+      throw error1;
+    }
+    var exchange = 'logs';
+
+    channel.assertExchange(exchange, 'fanout', {
+      durable: false
+    });
+
+    channel.assertQueue('', {
+      exclusive: true
+    }, function (error2, q) {
+      if (error2) {
+        throw error2;
+      }
+      console.log(" [*] Waiting for messages in %s. To exit press CTRL+C", q.queue);
+      channel.bindQueue(q.queue, exchange, '');
+
+      //When published, this will print out what has been published
+      channel.consume(q.queue, function (msg) {
+        if (msg.content) {
+          console.log(" [x] %s", msg.content.toString());
+        }
+      }, {
+        noAck: true
+      });
+    });
+  });
+});

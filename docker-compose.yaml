@@ -36,14 +36,17 @@ services:
     entrypoint: [ "bash", "/scripts/mongo_setup.sh"]
   node1:
     build: ./nodejs
+    restart: always
     ports:
       - "81:3000"
   node2:
     build: ./nodejs
+    restart: always
     ports:
       - "82:3000"
   node3:
     build: ./nodejs
+    restart: always
     ports:
       - "83:3000"
   nginx: 
@@ -54,3 +57,56 @@ services:
      - node1 
      - node2 
      - node3
+  stats: 
+    image: bitnami/rabbitmq
+    restart: always 
+    environment: 
+      - RABBITMQ_NODE_TYPE=stats 
+      - RABBITMQ_NODE_NAME=rabbit@stats 
+      - RABBITMQ_ERL_COOKIE=s3cr3tc00ki3
+    volumes: 
+      - 'rabbitmqstats_data:/bitnami' 
+  queue-disc1: 
+    image: bitnami/rabbitmq
+    restart: always
+    environment: 
+      - RABBITMQ_NODE_TYPE=queue-disc 
+      - RABBITMQ_NODE_NAME=rabbit@queue-disc1 
+      - RABBITMQ_CLUSTER_NODE_NAME=rabbit@stats 
+      - RABBITMQ_ERL_COOKIE=s3cr3tc00ki3
+    volumes: 
+      - 'rabbitmqdisc1_data:/bitnami' 
+    depends_on: 
+      - stats 
+  queue-ram1:
+    restart: always
+    image: bitnami/rabbitmq 
+    environment: 
+      - RABBITMQ_NODE_TYPE=queue-ram 
+      - RABBITMQ_NODE_NAME=rabbit@queue-ram1 
+      - RABBITMQ_CLUSTER_NODE_NAME=rabbit@stats 
+      - RABBITMQ_ERL_COOKIE=s3cr3tc00ki3
+    volumes: 
+      - 'rabbitmqram1_data:/bitnami' 
+    depends_on: 
+      - stats 
+ 
+  haproxy: 
+    image: haproxy:1.7 
+    volumes: 
+      - ./haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro 
+    depends_on: 
+      - stats 
+      - queue-disc1 
+      - queue-ram1 
+    ports: 
+      - 15672:15672 
+      - 5672:5672
+ 
+volumes: 
+  rabbitmqstats_data: 
+    driver: local 
+  rabbitmqdisc1_data: 
+    driver: local 
+  rabbitmqram1_data: 
+    driver: local
