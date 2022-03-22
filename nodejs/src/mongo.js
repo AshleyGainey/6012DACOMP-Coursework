@@ -83,12 +83,12 @@ app.listen(port, () => {
 })
 
 var nodeID = Math.floor(Math.random() * (100 - 1 + 1) + 1);
-toSend = { "hostname": myhostname, "status": "alive", "nodeID": nodeID };
-setInterval(function () {
-  //Publsher Code
-  amqp.connect('amqp://test:test@192.168.56.108', function (error0, connection) {
-    console.log("Sending the alive message. Host Name:" + myhostname + " The Node ID:" + nodeID);
+var nodes = [];
 
+//Publsher Code
+setInterval(function () {
+  amqp.connect('amqp://user:bitnami@192.168.56.108', function (error0, connection) {
+    console.log("Sending the alive message. Host Name:" + myhostname + " The Node ID:" + nodeID);
     if (error0) {
       throw error0;
     }
@@ -97,10 +97,8 @@ setInterval(function () {
         throw error1;
       }
 
-
-
       var exchange = 'logs';
-      var msg = toSend;
+      var msg = { "hostname": myhostname, "status": "alive", "nodeID": nodeID };
 
       channel.assertExchange(exchange, 'fanout', {
         durable: false
@@ -117,7 +115,7 @@ setInterval(function () {
 }, 2000);
 
 //Subscriber Code
-amqp.connect('amqp://test:test@192.168.56.108', function (error0, connection) {
+amqp.connect('amqp://user:bitnami@192.168.56.108', function (error0, connection) {
   console.log("In Subscriber part, awaiting for messages.");
   if (error0) {
     throw error0;
@@ -141,10 +139,48 @@ amqp.connect('amqp://test:test@192.168.56.108', function (error0, connection) {
       console.log(" [*] Waiting for messages in %s. To exit press CTRL+C", q.queue);
       channel.bindQueue(q.queue, exchange, '');
 
-      //When published, this will print out what has been published
       channel.consume(q.queue, function (msg) {
         if (msg.content) {
+          console.log('Message Content: ' + msg.content.toString());
+          var message = JSON.parse(msg.content.toString());
+
+          var node_exists = false;
+          var indexOfNodeExists = 0;
+
+          // Check the nodes in the array to see if they exist
+          Object.entries(nodes).forEach((hostname, props) => {
+            console.log('Node ' + indexOfNodeExists + 'message hostname:' + message.hostname);
+            console.log('Node ' + indexOfNodeExists + 'message hostname:' + message.Date);
+
+            //Increase the index counter only when the node hasn't been found
+            if (node_exists == false) {
+              indexOfNodeExists++;
+            }
+            //If the node does exist switch the flag
+            if (hostname == message.hostname) {
+              node_exists = true;
+            }
+          })
+
+          //Getting date and time from right now
+          let date = new Date()
+          var dateNow = date.toISOString();
+          console.log('The newDate is now: ' + dateNow);
+
+          if (node_exists) {
+          //Change the existing entry in the nodes list with the nodeID and with the updated date.
+            nodes[myhostname] = { "nodeID": nodeID, "Date": dateNow };
+          } else {
+            //Push the node to the nodes array
+            nodes[indexOfNodeExists] = { "nodeID": nodeID, "Date": dateNow };
+          }
+
+      //When published, the subscriber will print out what has been published
           console.log(" [x] %s", msg.content.toString());
+        }
+        else {
+          //If there is no content, then log to the console that no message was received.
+          console.log('No Message')
         }
       }, {
         noAck: true
