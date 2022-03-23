@@ -97,8 +97,13 @@ setInterval(function () {
         throw error1;
       }
 
+      //Getting date and time from right now
+      let date = new Date()
+      var dateNow = date.toISOString();
+      console.log('The newDate is now: ' + dateNow);
+
       var exchange = 'logs';
-      var msg = { "hostname": myhostname, "status": "alive", "nodeID": nodeID };
+      var msg = { "hostName": myhostname, "status": "alive", "nodeID": nodeID, "date": dateNow };
 
       channel.assertExchange(exchange, 'fanout', {
         durable: false
@@ -141,8 +146,20 @@ amqp.connect('amqp://user:bitnami@192.168.56.108', function (error0, connection)
 
       channel.consume(q.queue, function (msg) {
         if (msg.content) {
-          console.log('Message Content: ' + msg.content.toString());
           var message = JSON.parse(msg.content.toString());
+
+          console.log('Message Content 2 - Hostname: ' + message["hostname"]);
+          console.log('Message Content 2 - NodeID: ' + message["NodeID"]);
+          console.log('Message Content 2 - Hostname: ' + message["Date"]);
+          console.log('Message Content 2 - Status: ' + message["Status"]);
+
+
+          console.log("In Subscriber: [x] %s", msg.content.toString());
+          // var message = JSON.parse(JSON.stringify(msg.content).toString());
+          console.log('Message Content 3 JSON - Hostname: ' + message.hostname);
+          console.log('Message Content 3 JSON - NodeID: ' + message.nodeID);
+          console.log('Message Content 3 JSON - Date: ' + message.date);
+          console.log('Message Content 3 JSON - Status: ' + message.status);
 
           var node_exists = false;
           var indexOfNodeExists = 0;
@@ -162,21 +179,16 @@ amqp.connect('amqp://user:bitnami@192.168.56.108', function (error0, connection)
             }
           })
 
-          //Getting date and time from right now
-          let date = new Date()
-          var dateNow = date.toISOString();
-          console.log('The newDate is now: ' + dateNow);
-
           if (node_exists) {
           //Change the existing entry in the nodes list with the nodeID and with the updated date.
-            nodes[myhostname] = { "nodeID": nodeID, "Date": dateNow };
+            nodes[myhostname] = { "nodeID": nodeID, "Date": message.dateNow };
           } else {
             //Push the node to the nodes array
-            nodes[indexOfNodeExists] = { "nodeID": nodeID, "Date": dateNow };
+            nodes[indexOfNodeExists] = { "nodeID": nodeID, "Date": message.dateNow };
           }
 
       //When published, the subscriber will print out what has been published
-          console.log(" [x] %s", msg.content.toString());
+          console.log("In Subscriber: [x] %s", msg.content.toString());
         }
         else {
           //If there is no content, then log to the console that no message was received.
