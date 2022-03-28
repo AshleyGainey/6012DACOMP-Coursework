@@ -16,6 +16,8 @@ var myhostname = os.hostname();
 
 var amqp = require('amqplib/callback_api');
 
+var nodes = [];
+
 //instance of express and port to use for inbound connections.
 const app = express()
 const port = 3000
@@ -83,12 +85,12 @@ app.listen(port, () => {
 })
 
 var nodeID = Math.floor(Math.random() * (100 - 1 + 1) + 1);
-var nodes = [];
 
-//Publsher Code
+
+//Publisher Code
 setInterval(function () {
   amqp.connect('amqp://user:bitnami@192.168.56.108', function (error0, connection) {
-    console.log("Sending the alive message. Host Name:" + myhostname + " The Node ID:" + nodeID);
+    // console.log("Sending the alive message. Host Name:" + myhostname + " The Node ID:" + nodeID);
     if (error0) {
       throw error0;
     }
@@ -164,3 +166,28 @@ amqp.connect('amqp://user:bitnami@192.168.56.108', function (error0, connection)
     });
   });
 });
+
+
+setInterval(function () {
+  let maxID = -1;
+  let maxHostName = -1;
+  Object.entries(nodes).forEach(([hostname, prop]) => {
+    // Is the current node the same hostname as the saved HostName?
+    if (hostname == myhostname) {
+      //Is the nodeID of this node higher than the one saved?
+      if (prop.nodeID > maxID) {
+        // Set max Id to the current one (which is the biggest so far!)
+        maxID = prop.nodeID
+        //Leader has been declared!
+        leader = 1;
+        // Set the maxhostname to the host name of the highest node
+        maxHostName = hostname;
+      }
+    }
+
+  });
+  //If the hostName is equal to the leader's Host Name then it is the leader
+  if (maxHostName == myhostname) {
+    console.log('I am the leader!');
+  }
+}, 5000)
