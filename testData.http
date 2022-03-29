@@ -1,0 +1,89 @@
+### Get what is in the DB.
+
+GET http://192.168.56.108
+
+### Sample Data below
+
+POST http://192.168.56.108:80 HTTP/1.1 
+content-type: application/json
+
+  { "_id": 1, "accountID": 1, "userName": "ashley.gainey", "titleID": 1, "userAction": "PlayButtonPress", "dateAndTime": "2022-01-12T13:34:00Z", "pointOfInteraction" : "2:59", "typeOfInteraction" : "Play"  }
+
+###
+
+POST http://192.168.56.108:80 HTTP/1.1 
+content-type: application/json 
+
+  { "_id": 2, "accountID": 2, "userName": "bradley.sour", "titleID": 2, "userAction": "MenuButtonPress", "dateAndTime": "2022-01-15T13:34:34Z", "pointOfInteraction" : "0:10", "typeOfInteraction" : "SubtitlesOff" }
+###
+
+POST http://192.168.56.108:80 HTTP/1.1 
+content-type: application/json 
+
+  { "_id": 3, "accountID": 3, "userName": "barney.old", "titleID": 3, "userAction": "FastForwardButtonPress",  "dateAndTime": "2022-01-15T12:34:52Z",  "pointOfInteraction" : "3:20", "typeOfInteraction" : "SkipEpisode" }
+
+  
+###
+
+POST http://192.168.56.108:80 HTTP/1.1 
+content-type: application/json 
+
+  { "_id": 4, "accountID": 4, "userName": "kevin.wood", "titleID": 4 , "userAction":  "MenuButtonPress",  "dateAndTime": "2022-01-15T18:34:00Z", "pointOfInteraction" : "1:04:20", "typeOfInteraction" : "SubtitlesOn" }
+
+  
+###
+
+POST http://192.168.56.108:80 HTTP/1.1 
+content-type: application/json 
+
+  { "_id": 5, "accountID": 5, "userName": "richard.pans", "titleID": 5, "userAction": "PlayButtonPress",  "dateAndTime": "2022-01-16T18:44:30Z", "pointOfInteraction" : "10:30", "typeOfInteraction" : "Pause"  }
+
+###
+
+POST http://192.168.56.108:80 HTTP/1.1 
+content-type: application/json 
+
+  { "_id": 6, "accountID": 5, "userName": "richard.pans", "titleID": 5, "userAction": "PlayButtonPress", "dateAndTime": "2022-01-16T18:49:10Z", "pointOfInteraction" : "10:30", "typeOfInteraction" : "Play"  }
+  
+###
+
+POST http://192.168.56.108:80 HTTP/1.1 
+content-type: application/json
+
+  { "_id": 7, "accountID": 5, "userName": "richard.pans", "titleID": 5, "userAction": "BackButtonPress", "dateAndTime": "2022-01-16T19:54:50Z", "pointOfInteraction" : "1:30:30", "typeOfInteraction" : "Stop" }
+  
+###
+
+POST http://192.168.56.108:80 HTTP/1.1 
+content-type: application/json 
+
+  { "_id": 8, "accountID": 6, "userName": "louise.friend", "titleID": 6, "userAction": "PlayButtonPress", "dateAndTime": "2022-01-16T13:34:00Z", "pointOfInteraction" : "00:02", "typeOfInteraction" : "Pause" }
+  
+###
+
+POST http://192.168.56.108:80 HTTP/1.1 
+content-type: application/json 
+
+  { "_id": 9, "accountID": 7, "userName": "mystery.daisy", "titleID": 7, "userAction": "RightArrowPress", "dateAndTime": "2022-01-17T19:04:10Z", "pointOfInteraction" : "02:35", "typeOfInteraction" : "Forward" }
+  
+###
+
+POST http://192.168.56.108:80 HTTP/1.1 
+content-type: application/json 
+
+  { "_id": 10, "accountID": 7, "userName": "mystery.daisy", "titleID": 7, "userAction": "VolumeButtonUpPress", "dateAndTime": "2022-01-17T19:05:12Z", "pointOfInteraction" : "10:15", "typeOfInteraction" : "VolumeUp" }
+  
+###
+
+POST http://192.168.56.108:80 HTTP/1.1 
+content-type: application/json 
+
+  { "_id": 11, "accountID": 1, "userName": "ashley.gainey", "titleID": 6, "userAction": "VolumeDownPress", "dateAndTime": "2022-01-20T19:21:59Z", "pointOfInteraction": "1:01", "typeOfInteraction": "VolumeDown" }
+  
+###
+
+GET http://192.168.56.108:81/total
+
+
+###
+DELETE http://192.168.56.108:81/8 HTTP/1.1

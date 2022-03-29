@@ -153,7 +153,7 @@ amqp.connect('amqp://user:bitnami@192.168.56.108', function (error0, connection)
           var message = JSON.parse(msg.content);
 
           //Replace the entry or add an entry in the nodes list with the nodeID and an updated date.
-          nodes[myhostname] = { "nodeID": nodeID, "Date": message.date };
+          nodes[myhostname] = { "nodeID": nodeID, "date": message.date };
           console.log('Replaced/Added entry to nodes array');
         }
         else {
@@ -170,7 +170,7 @@ amqp.connect('amqp://user:bitnami@192.168.56.108', function (error0, connection)
 
 setInterval(function () {
   let maxID = -1;
-  let maxHostName = -1;
+  let maxHostName = "";
   Object.entries(nodes).forEach(([hostname, prop]) => {
     // Is the current node the same hostname as the saved HostName?
     if (hostname == myhostname) {
@@ -189,5 +189,32 @@ setInterval(function () {
   //If the hostName is equal to the leader's Host Name then it is the leader
   if (maxHostName == myhostname) {
     console.log('I am the leader!');
+
+    let dateNow = new Date().getTime() / 1000;
+
+    Object.entries(nodes).forEach(([hostname, prop]) => {
+      // let currentNodeDate = new Date()
+      // currentNodeDate = prop.date
+      let currentNodeDateConverted = new Date(prop.date).getTime() / 1000;
+      console.log('Date Converted 2: ' + currentNodeDateConverted);
+      console.log('------------------------------------');
+      console.log('Date Now: ' + dateNow);
+      console.log('Date Converted: ' + currentNodeDateConverted);
+
+
+      let timeBetweenNodeMessage = dateNow - currentNodeDateConverted;
+
+      console.log('Time between them: ' + timeBetweenNodeMessage);
+
+
+      //If message hasn't been received for 4 seconds
+      if (timeBetweenNodeMessage => 4) {
+        // Restart container
+        console.log('Need to restart container. Took more than 4 seconds');
+      } else {
+        console.log('No need to restart container. Sending it in the correct time');
+      }
+
+    });
   }
 }, 5000)
