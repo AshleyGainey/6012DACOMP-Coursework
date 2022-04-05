@@ -13,6 +13,7 @@ Features:
 
 [x] Leadership Election
 
-[] Automatically adjust for failed containers
+[x] Automatically adjust for failed containers
 
 [] Auto Scaling between 16:00 - 18:00
+     --- NOTE: partially implementated.
