@@ -7,5 +7,6 @@ COPY src/ .
 RUN ls -la /usr/src/app/*
 RUN npm install express mongoose
 RUN npm install amqplib
+RUN npm install axios
 RUN npm install pm2 -g
 CMD [ "pm2-runtime", "mongo.js"]

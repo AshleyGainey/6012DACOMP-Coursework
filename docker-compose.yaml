@@ -39,16 +39,22 @@ services:
     restart: always
     ports:
       - "81:3000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
   node2:
     build: ./nodejs
     restart: always
     ports:
       - "82:3000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
   node3:
     build: ./nodejs
     restart: always
     ports:
       - "83:3000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
   nginx: 
     build: ./nginx 
     ports: 

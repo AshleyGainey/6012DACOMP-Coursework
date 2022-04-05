@@ -16,19 +16,20 @@ var myhostname = os.hostname();
 
 var amqp = require('amqplib/callback_api');
 
+//Holds the nodes for each host
 var nodes = [];
 
 //instance of express and port to use for inbound connections.
 const app = express()
 const port = 3000
 
+const axios = require("axios");
+
 //connection string listing the mongo servers. This is an alternative to using a load balancer. THIS SHOULD BE DISCUSSED IN YOUR ASSIGNMENT.
 const connectionString = 'mongodb://localmongo1:27017,localmongo2:27017,localmongo3:27017/notFlixDB?replicaSet=rs0';
 
 setInterval(function() {
-
-  console.log(`Intervals are used to fire a function for the lifetime of an application.`);
-
+  console.log(`Mongo JS code now executing`);
 }, 3000);
 
 //tell express to use the body parser. Note - This function was built into express but then moved to a seperate package.
@@ -43,6 +44,7 @@ db.on('error', console.error.bind(console, 'MongoDB connection error:'));
 
 var Schema = mongoose.Schema;
 
+//Structure of the assignment schema
 var notFlixSchema = new Schema({
   _id : Number,
   accountID: Number,
@@ -56,27 +58,21 @@ var notFlixSchema = new Schema({
 
 var notFlixModel = mongoose.model('Interactions', notFlixSchema, 'interactions');
 
+//Deal with the get request by sending back all of the information
 app.get('/', (req, res) => {
-  notFlixModel.find({},'_id accountID userName titleID userAction dateAndTime pointOfInteraction typeOfInteraction lastName', (err, interactions) => {
+  notFlixModel.find({}, '_id accountID userName titleID userAction dateAndTime pointOfInteraction typeOfInteraction', (err, interactions) => {
     if(err) return handleError(err);
     res.send(JSON.stringify(interactions))
   }) 
 })
 
+// Deal with sending the data into the DB
 app.post('/',  (req, res) => { 
   var new_notFlix_instance = new notFlixModel(req.body); 
   new_notFlix_instance.save(function (err) { 
   if (err) res.send('Error'); 
     res.send(JSON.stringify(req.body)) 
   }); 
-}) 
-
-app.put('/',  (req, res) => {
-  res.send('Got a PUT request at /')
-})
-
-app.delete('/',  (req, res) => {
-  res.send('Got a DELETE request at /')
 })
 
 //bind the express web service to the port specified
@@ -84,8 +80,8 @@ app.listen(port, () => {
  console.log(`Express Application listening at port ` + port)
 })
 
+// Randomly generate a number for the node id
 var nodeID = Math.floor(Math.random() * (100 - 1 + 1) + 1);
-
 
 //Publisher Code
 setInterval(function () {
@@ -171,6 +167,10 @@ amqp.connect('amqp://user:bitnami@192.168.56.108', function (error0, connection)
 setInterval(function () {
   let maxID = -1;
   let maxHostName = "";
+  leader = 0;
+  activeNodes = 0;
+
+
   Object.entries(nodes).forEach(([hostname, prop]) => {
     // Is the current node the same hostname as the saved HostName?
     if (hostname == myhostname) {
@@ -187,34 +187,51 @@ setInterval(function () {
 
   });
   //If the hostName is equal to the leader's Host Name then it is the leader
-  if (maxHostName == myhostname) {
+  if (maxHostName == myhostname && leader == 1) {
     console.log('I am the leader!');
 
-    let dateNow = new Date().getTime() / 1000;
+    //Get time now and also the epoch time
+    let dateNow = new Date;
+    let dateNowEpoch = new Date().getTime() / 1000;
 
     Object.entries(nodes).forEach(([hostname, prop]) => {
-      // let currentNodeDate = new Date()
-      // currentNodeDate = prop.date
+      // Get the difference between the time message was sent and the time now.
       let currentNodeDateConverted = new Date(prop.date).getTime() / 1000;
-      console.log('Date Converted 2: ' + currentNodeDateConverted);
-      console.log('------------------------------------');
-      console.log('Date Now: ' + dateNow);
-      console.log('Date Converted: ' + currentNodeDateConverted);
+      let timeBetweenNodeMessage = dateNowEpoch - currentNodeDateConverted;
 
-
-      let timeBetweenNodeMessage = dateNow - currentNodeDateConverted;
-
-      console.log('Time between them: ' + timeBetweenNodeMessage);
-
-
-      //If message hasn't been received for 4 seconds
-      if (timeBetweenNodeMessage => 4) {
-        // Restart container
-        console.log('Need to restart container. Took more than 4 seconds');
-      } else {
+      //If message hasn't been received for 20 seconds
+      if (timeBetweenNodeMessage < 20) {
         console.log('No need to restart container. Sending it in the correct time');
+      } else {
+        // Restart container
+        console.log('Need to restart container. Took more than 20 seconds');
+        restartContainer(myhostname);
       }
+
+      //TODO Ash: Come back to later
+      // if (dateNow.getHours() >= 16 && dateNow.getHours() <= 18) {
+      //   //Scale up
+      // } else if (dateNow.getHours() >= 18) {
+      //   //Scale down
+      // }
+
 
     });
   }
 }, 5000)
+
+async function restartContainer(hostNameToRestart) {
+  if (leader == 1) {
+    console.log("Restarting container");
+    try {
+      console.log("Stopping container: " + hostNameToRestart);
+      await axios.post(`http://host.docker.internal:2375/containers/${hostNameToRestart}/stop`).then(function (response) { console.log(response) });
+      console.log("Starting container: " + hostNameToRestart);
+      // await axios.post(`http://host.docker.internal:2375/containers/create?name= ${myhostname}`, containerDetails).then(function (response) { console.log(response) });
+      await axios.post(`http://host.docker.internal:2375/containers/${hostNameToRestart}/start`).then(function (response) { console.log(response) });;
+    }
+    catch (error) {
+      console.log(error);
+    }
+  }
+}

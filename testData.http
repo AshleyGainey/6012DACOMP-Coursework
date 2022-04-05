@@ -81,9 +81,3 @@ content-type: application/json
   { "_id": 11, "accountID": 1, "userName": "ashley.gainey", "titleID": 6, "userAction": "VolumeDownPress", "dateAndTime": "2022-01-20T19:21:59Z", "pointOfInteraction": "1:01", "typeOfInteraction": "VolumeDown" }
   
 ###
-
-GET http://192.168.56.108:81/total
-
-
-###
-DELETE http://192.168.56.108:81/8 HTTP/1.1
