@@ -11,6 +11,7 @@ const express = require('express')
 //used to parse the server response from json to object.
 const bodyParser = require('body-parser');
 
+//Get the hostname of the node
 const os = require("os");
 var myhostname = os.hostname();
 
@@ -117,6 +118,7 @@ setInterval(function () {
   });
 }, 2000);
 
+
 //Subscriber Code
 amqp.connect('amqp://user:bitnami@192.168.56.108', function (error0, connection) {
   console.log("In Subscriber part, awaiting for messages.");
@@ -154,13 +156,16 @@ amqp.connect('amqp://user:bitnami@192.168.56.108', function (error0, connection)
           let date = JSON.parse(msg.content.toString("utf-8")).date;
           console.log('date' + date);
 
+          console.log(" [x] %s", msg.content.toString());
+
           //Add/Replace information to the node (if already exists then replace, if not exist add to array)
           nodes.some(node => node.hostName === hostName) ?
             (nodes.find(e => e.hostName === hostName)).date
-            = newDate
+            = date
             : nodes.push({
               "nodeID": newNodeID,
               "hostName": hostName,
+              "status": "Alive",
               "date": date
             });
 
@@ -178,77 +183,189 @@ amqp.connect('amqp://user:bitnami@192.168.56.108', function (error0, connection)
 });
 
 
+let systemLeader = 0;
+// let leader = 1;
+// setInterval(function () {
+
+//   //Get time now and also the epoch time
+//   let dateNow = new Date;
+//   let dateNowEpoch = new Date().getTime() / 1000;
+
+//   nodes.forEach(function (node) {
+//     let currentNodeDateConverted = new Date(node.date).getTime() / 1000;
+//     let timeBetweenNodeMessage = dateNowEpoch - currentNodeDateConverted;
+//     if (node.hostName == myhostname || timeBetweenNodeMessage > 10) {
+
+//     } else {
+//       if (node.nodeID > nodeID) {
+//         leader = 0;
+//       }
+//     }
+//   });
+
+//   sysLeader = (leader === 1) ? 1 : 0;
+// }, 5000)
+
+let maxHostName = "";
+
+// setInterval(function () {
+//   console.log(JSON.stringify(nodes));
+//   leader = 0;
+//   Object.entries(nodes).forEach(([hostname, prop]) => {
+//     console.log('hostname: ' + prop.hostName + ' prop nodeID : ' + prop.nodeID + ' prop status : ' + prop.status + ' prop date : ' + prop.date)
+//     // console.log("test" + JSON.stringify(hostname) + JSON.stringify(prop))
+//     console.log('myhostname: ' + myhostname);
+//     console.log('prop.hostName : ' + prop.hostName);
+//     if (prop.hostName != myhostname) {
+//       if (prop.nodeID > nodeID) {
+//         leader = 1;
+//         maxHostName = prop.hostName;
+//       }
+//     }
+//     if ((leader == 1)) {
+//       systemLeader = 1;
+//     }
+//   });
+
+//   console.log('SystemLeader: ' + systemLeader);
+// }, 2000);
+
+var maxNodeID = 0;
+
 setInterval(function () {
-  let maxID = -1;
-  let maxHostName = "";
-  leader = 0;
+  console.log('attempting to do leadership code 0');
+  console.log(JSON.stringify(nodes));
+  leader = 1;
   activeNodes = 0;
-
-
-  console.log("--------- Each node Start ----------")
   Object.entries(nodes).forEach(([hostname, prop]) => {
-    console.log('hostname: ' + prop.hostName + ' prop nodeID : ' + prop.nodeID + ' prop date : ' + prop.date)
-    // Is the current node the same hostname as the saved HostName?
-    if (prop.hostName == myhostname) {
-      //Is the nodeID of this node higher than the one saved?
-      if (prop.nodeID > maxID) {
-        // Set max Id to the current one (which is the biggest so far!)
-        maxID = prop.nodeID
-        //Leader has been declared!
-        leader = 1;
-        // Set the maxhostname to the host name of the highest node
-        maxHostName = prop.hostName;
+    console.log('attempting to do leadership code 1');
+    console.log("test" + JSON.stringify(prop.hostName) + JSON.stringify(prop))
+    maxNodeID = nodeID;
+    if (prop.hostName != myhostname) {
+      console.log('attempting to do leadership code 2');
+      if ("nodeID" in prop) {
+        console.log('attempting to do leadership code 3');
+        activeNodes++;
+        if (prop.nodeID > nodeID) {
+          console.log('attempting to do leadership code 4');
+          leader = 0;
+        }
       }
     }
+    if ((leader == 1) && (activeNodes == nodes.length)) {
+      systemLeader = 1;
+      console.log('I am the leader');
+    }
   });
-  console.log("--------- Each node End ----------")
-  //If the hostName is equal to the leader's Host Name then it is the leader
-  if (maxHostName == myhostname && leader == 1) {
-    console.log('I am the leader!');
+}, 2000);
 
-    //Get time now and also the epoch time
+
+
+
+
+setInterval(function () {
+  if (systemLeader == 1) {
+    console.log('I am the leader');
+
+    // Get time now and also the epoch time
     let dateNow = new Date;
     let dateNowEpoch = new Date().getTime() / 1000;
+    console.log("--------- Each node Start ----------")
 
     Object.entries(nodes).forEach(([hostname, prop]) => {
+      console.log("testinggggg" + JSON.stringify(hostName) + JSON.stringify(prop))
+      console.log('hostname: ' + prop.hostName + ' prop nodeID : ' + prop.nodeID + ' prop status : ' + prop.status + ' prop date : ' + prop.date)
+
       // Get the difference between the time message was sent and the time now.
       let currentNodeDateConverted = new Date(prop.date).getTime() / 1000;
       let timeBetweenNodeMessage = dateNowEpoch - currentNodeDateConverted;
 
+      console.log('timeBetweenNodeMessage: ' + timeBetweenNodeMessage);
       //If message hasn't been received for 20 seconds
       if (timeBetweenNodeMessage < 20) {
         console.log('No need to restart container. Sending it in the correct time');
       } else {
         // Will go to function to restart container
         console.log('Need to restart container. Took more than 20 seconds');
-        restartContainer(myhostname);
+        restartContainer(prop);
       }
-
-        //TODO Ash: Come back to later
-        // if (dateNow.getHours() >= 16 && dateNow.getHours() <= 18) {
-        //   //Scale up
-        // } else if (dateNow.getHours() >= 18) {
-        //   //Scale down
-        // }
-
-
     });
-  }
-}, 5000);
+    console.log("--------- Each node End ----------")
 
-var restarted = 1;
-async function restartContainer(hostNameToRestart) {
-  if (leader == 1) {
+
+    // TODO Ash: Come back to later
+    if (dateNow.getHours() >= 16 && dateNow.getHours() <= 18) {
+      //Scale up
+    } else if (dateNow.getHours() >= 18) {
+      //Scale down
+    }
+  }
+}, 5000)
+
+
+
+
+// setInterval(function () {
+//   let maxID = -1;
+//   let maxHostName = "";
+//   leader = 0;
+//   activeNodes = 0;
+
+
+//   console.log("--------- Each node Start ----------")
+//   Object.entries(nodes).forEach(([hostname, prop]) => {
+//     console.log('hostname: ' + prop.hostName + ' prop nodeID : ' + prop.nodeID + ' prop date : ' + prop.date)
+//     // Is the current node the same hostname as the saved HostName?
+//     if (prop.hostName != myhostname) {
+//       //Is the nodeID of this node higher than the one saved?
+//       if (prop.nodeID > maxID) {
+//         // Set max Id to the current one (which is the biggest so far!)
+//         maxID = prop.nodeID
+//         //Leader has been declared!
+//         leader = 1;
+//         // Set the maxhostname to the host name of the highest node
+//         maxHostName = prop.hostName;
+//       }
+//     }
+//   });
+//   console.log("--------- Each node End ----------")
+//   //If the hostName is equal to the leader's Host Name then it is the leader
+//   if (maxHostName != myhostname && leader == 1) {
+//     console.log('I am the leader!');
+
+//
+//     });
+//   }
+// }, 5000);
+
+async function restartContainer(propToRestart) {
+  let hostNameToRestart = propToRestart.hostname
+  if (leader == 1 && propToRestart.status != "Restarting") {
     console.log("Restarting container");
     try {
       console.log("Stopping container: " + hostNameToRestart);
+      console.log("Stopping container (ssss): " + propToRestart.hostname);
       //Stops the container due to the message not being delivered within 20 seconds
       await axios.post(`http://host.docker.internal:2375/containers/${hostNameToRestart}/stop`).then(function (response) { console.log(response) });
-      console.log("Starting container: " + hostNameToRestart);
+      console.log("Starting container: " + propToRestart.hostname);
       // await axios.post(`http://host.docker.internal:2375/containers/create?name= ${myhostname}`, containerDetails).then(function (response) { console.log(response) });
       // Starts the container back up again
       await axios.post(`http://host.docker.internal:2375/containers/${hostNameToRestart}/start`).then(function (response) { console.log(response) });;
-      restarted = 1
+
+      nodes.some(node => node.hostName === hostNameToRestart) ?
+        (nodes.find(e => e.hostName === hostNameToRestart)).status
+        = "Restarting"
+        : console.log('ERRORR ASHLEY TO DO WITH RESTART NODE ARRAY (here on/around line 319')
+
+      console.log('Replaced entry in nodes array to say we are restarting the container');
+
+
+      console.log("--------- Each node RESTART Start ----------")
+      Object.entries(nodes).forEach(([hostname, prop]) => {
+        console.log('hostname: ' + prop.hostName + ' prop nodeID : ' + prop.nodeID + ' prop status : ' + prop.status + ' prop date : ' + prop.date)
+      });
+      console.log("--------- Each node RESTART End ----------")
+
     }
     catch (error) {
       console.log(error);

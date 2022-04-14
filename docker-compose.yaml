@@ -37,6 +37,7 @@ services:
   node1:
     build: ./nodejs
     restart: always
+    hostname: node1
     ports:
       - "81:3000"
     extra_hosts:
@@ -44,6 +45,7 @@ services:
   node2:
     build: ./nodejs
     restart: always
+    hostname: node2
     ports:
       - "82:3000"
     extra_hosts:
@@ -51,6 +53,7 @@ services:
   node3:
     build: ./nodejs
     restart: always
+    hostname: node3
     ports:
       - "83:3000"
     extra_hosts:
