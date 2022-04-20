@@ -5,7 +5,7 @@ services:
     container_name: localmongo1
     image: mongo:4.0-xenial
     ports:
-      - "40001:27017"
+      - "40002:27017"
     restart: always
     entrypoint: [ "/usr/bin/mongod", "--bind_ip_all", "--replSet", "rs0" ]
   mongo2:
@@ -13,7 +13,7 @@ services:
     container_name: localmongo2
     image: mongo:4.0-xenial
     ports:
-      - "40002:27017"
+      - "40003:27017"
     restart: always
     entrypoint: [ "/usr/bin/mongod", "--bind_ip_all", "--replSet", "rs0" ]
   mongo3:
@@ -21,7 +21,7 @@ services:
     container_name: localmongo3
     image: mongo:4.0-xenial
     ports:
-      - "40003:27017"
+      - "40004:27017"
     restart: always
     entrypoint: [ "/usr/bin/mongod", "--bind_ip_all", "--replSet", "rs0" ]
   mongosetup:
@@ -36,48 +36,38 @@ services:
     entrypoint: [ "bash", "/scripts/mongo_setup.sh"]
   node1:
     build: ./nodejs
-    restart: always
     hostname: node1
     ports:
       - "81:3000"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
   node2:
     build: ./nodejs
-    restart: always
     hostname: node2
     ports:
       - "82:3000"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
   node3:
     build: ./nodejs
-    restart: always
     hostname: node3
     ports:
       - "83:3000"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-  nginx: 
-    build: ./nginx 
+  nginx:
+    build: ./nginx
+    container_name: "nginx"
     ports: 
       - "80:80" 
     depends_on: 
-     - node1 
-     - node2 
-     - node3
+      - node1 
+      - node2 
+      - node3
   stats: 
-    image: bitnami/rabbitmq
-    restart: always 
-    environment: 
-      - RABBITMQ_NODE_TYPE=stats 
-      - RABBITMQ_NODE_NAME=rabbit@stats 
-      - RABBITMQ_ERL_COOKIE=s3cr3tc00ki3
-    volumes: 
-      - 'rabbitmqstats_data:/bitnami' 
+      image: bitnami/rabbitmq
+      environment:
+        - RABBITMQ_NODE_TYPE=stats
+        - RABBITMQ_NODE_NAME=rabbit@stats
+        - RABBITMQ_ERL_COOKIE=s3cr3tc00ki3
+      volumes:
+        - 'rabbitmqstats_data:/bitnami'
   queue-disc1: 
     image: bitnami/rabbitmq
-    restart: always
     environment: 
       - RABBITMQ_NODE_TYPE=queue-disc 
       - RABBITMQ_NODE_NAME=rabbit@queue-disc1 
@@ -88,7 +78,6 @@ services:
     depends_on: 
       - stats 
   queue-ram1:
-    restart: always
     image: bitnami/rabbitmq 
     environment: 
       - RABBITMQ_NODE_TYPE=queue-ram 
