@@ -30,6 +30,15 @@ services:
     networks:
       - nodejs
     entrypoint: [ "/usr/bin/mongod", "--bind_ip_all", "--replSet", "rs0" ]
+  6012dacomp-coursework:
+    build: ./nodejs
+    networks:
+      - nodejs
+    volumes:
+      - ./scripts:/tmp
+    restart: "no"
+    command: sh -c "cp -r /tmp/ /conf/ && nginx -c /conf/nginx.conf -g \"daemon off;\""
+
   mongosetup:
     image: mongo:4.0-xenial
     depends_on:
