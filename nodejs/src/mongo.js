@@ -165,16 +165,16 @@ amqp.connect('amqp://user:bitnami@192.168.56.112', function (error0, connection)
           //Put the received message in a variable and parse it.
           var messageReceived = JSON.parse(msg.content.toString());
 
+          console.log("MessageReceivedddddddddddd: " + messageReceived);
           //Add/Replace information to the node (if already exists then replace, if not exist add to array)
           if (nodes.some(node => node.hostName === messageReceived.hostName)) {
-            var foundNode = nodes.find(foundNodeObject => foundNodeObject.hostName === messageReceived.hostName).date = timeSentReceived;
-            if (foundNode.nodeID === messageReceived.nodeID) {
-              
-              nodes.push(messageReceived);
+            var foundNode = nodes.find(foundNodeObject => foundNodeObject.hostName === messageReceived.hostName);
+            foundNode.date = timeSentReceived;
+            if (foundNode.nodeID !== messageReceived.nodeID) {
+              foundNode.nodeID = messageReceived.nodeID;
             }
           } else {
-            foundNode.nodeID = messageReceived.nodeID;
-            
+            nodes.push(messageReceived);
           }
           //Has sent the first message so change the flag
           firstMessageSentSuccessfully = true;
@@ -217,36 +217,87 @@ setInterval(function () {
   }
 }, 2000);
 
+
+
+setInterval(function () {
+  var isDeadNode = false;
+  //Check to see if any node...
+  Object.entries(nodes).forEach(([hostName, individualNode]) => {
+    //...hasn't sent a message in 10 or more seconds
+    var alive = (timeSentReceived - individualNode.date) < 9 ? true : false;
+    if (alive) {
+      // individualNode.status = "Alive";
+      //If so, don't do anything and output that the node is still alive
+      console.log("Node " + individualNode.hostName + " is alive.");
+    }
+    else {
+      //Not alive so it means it is dead and therefore, remove from the nodes array. 
+      nodes.splice(hostName, 1);
+      //And set is there a dead node to true
+      isDeadNode = true;
+      //Output a message to the console that that node is dead.
+      console.log(individualNode.hostName + " is dead and has been removed from the nodes array.");
+    }
+  });
+  if (systemLeader && isDeadNode) {
+    //Create a new Random nodeID (between 101 and 1000 - so not to get conflicts with the random ID that were being set).
+    let range = { min: 101, max: 1000 }
+    let delta = range.max - range.min
+    const randomID = Math.round(range.min + Math.random() * delta)
+
+    console.log('Need to restart container. Took more than 10 seconds');
+
+    //Create the container details
+    var hostAndNodeID = "node" + randomID;
+    const containerDetails = {
+      Image: "6012dacomp-coursework_node1",
+      Hostname: hostAndNodeID,
+      NetworkingConfig: {
+        EndpointsConfig: {
+          // Need to change this Ashley
+          "6012dacomp-coursework_nodejs": {},
+        },
+      },
+    };
+    makeStartNewContainer(hostAndNodeID, containerDetails);
+  }
+}, 10000);
+
+
+async function makeStartNewContainer(hostName, containerDetails) {
+  try {
+    console.log(`Attempting to start container: ${hostName}`);
+    console.log("Creating container: " + hostName);
+
+    await axios.post(`http://host.docker.internal:2375/containers/create?name=${hostName}`, containerDetails).then(function (response) { console.log(response) });
+    console.log("Starting container: " + hostName);
+    await axios.post(`http://host.docker.internal:2375/containers/${hostName}/start`);
+  } catch (error) {
+    console.log(error);
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // setInterval(function () {
 //   if (systemLeader == 1) {
-//     console.log('I am the leader');
-
-//     // Get time now and also the epoch time
-//     let dateNow = new Date;
-//     let dateNowEpoch = new Date().getTime() / 1000;
-//     console.log("--------- Each node Start ----------")
-
-//     Object.entries(nodes).forEach(([hostname, prop]) => {
-//       console.log("testinggggg" + JSON.stringify(hostName) + JSON.stringify(prop))
-//       console.log('hostname: ' + prop.hostName + ' prop nodeID : ' + prop.nodeID + ' prop status : ' + prop.status + ' prop date : ' + prop.date)
-
-//       // Get the difference between the time message was sent and the time now.
-//       let currentNodeDateConverted = new Date(prop.date).getTime() / 1000;
-//       let timeBetweenNodeMessage = dateNowEpoch - currentNodeDateConverted;
-
-//       console.log('timeBetweenNodeMessage: ' + timeBetweenNodeMessage);
-//       //If message hasn't been received for 20 seconds
-//       if (timeBetweenNodeMessage < 20) {
-//         console.log('No need to restart container. Sending it in the correct time');
-//       } else {
-//         // Will go to function to restart container
-//         console.log('Need to restart container. Took more than 20 seconds');
-//         restartContainer(prop);
-//       }
-//     });
-//     console.log("--------- Each node End ----------")
-
-
 //     // TODO Ash: Come back to later
 //     if (dateNow.getHours() >= 16 && dateNow.getHours() <= 18) {
 //       //Scale up
@@ -255,38 +306,3 @@ setInterval(function () {
 //     }
 //   }
 // }, 5000)
-
-// async function restartContainer(propToRestart) {
-//   let hostNameToRestart = propToRestart.hostname
-//   if (leader == 1 && propToRestart.status != "Restarting") {
-//     console.log("Restarting container");
-//     try {
-//       console.log("Stopping container: " + hostNameToRestart);
-//       console.log("Stopping container (ssss): " + propToRestart.hostname);
-//       //Stops the container due to the message not being delivered within 20 seconds
-//       await axios.post(`http://host.docker.internal:2375/containers/${hostNameToRestart}/stop`).then(function (response) { console.log(response) });
-//       console.log("Starting container: " + propToRestart.hostname);
-//       // await axios.post(`http://host.docker.internal:2375/containers/create?name= ${myhostname}`, containerDetails).then(function (response) { console.log(response) });
-//       // Starts the container back up again
-//       await axios.post(`http://host.docker.internal:2375/containers/${hostNameToRestart}/start`).then(function (response) { console.log(response) });;
-
-//       nodes.some(node => node.hostName === hostNameToRestart) ?
-//         (nodes.find(e => e.hostName === hostNameToRestart)).status
-//         = "Restarting"
-//         : console.log('ERRORR ASHLEY TO DO WITH RESTART NODE ARRAY (here on/around line 319')
-
-//       console.log('Replaced entry in nodes array to say we are restarting the container');
-
-
-//       console.log("--------- Each node RESTART Start ----------")
-//       Object.entries(nodes).forEach(([hostname, prop]) => {
-//         console.log('hostname: ' + prop.hostName + ' prop nodeID : ' + prop.nodeID + ' prop status : ' + prop.status + ' prop date : ' + prop.date)
-//       });
-//       console.log("--------- Each node RESTART End ----------")
-
-//     }
-//     catch (error) {
-//       console.log(error);
-//     }
-//   }
-// }
