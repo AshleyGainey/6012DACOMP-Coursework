@@ -6,6 +6,8 @@ services:
     image: mongo:4.0-xenial
     ports:
       - "40002:27017"
+    networks:
+      - nodejs
     restart: always
     entrypoint: [ "/usr/bin/mongod", "--bind_ip_all", "--replSet", "rs0" ]
   mongo2:
@@ -15,6 +17,8 @@ services:
     ports:
       - "40003:27017"
     restart: always
+    networks:
+      - nodejs
     entrypoint: [ "/usr/bin/mongod", "--bind_ip_all", "--replSet", "rs0" ]
   mongo3:
     hostname: mongo3
@@ -23,6 +27,8 @@ services:
     ports:
       - "40004:27017"
     restart: always
+    networks:
+      - nodejs
     entrypoint: [ "/usr/bin/mongod", "--bind_ip_all", "--replSet", "rs0" ]
   mongosetup:
     image: mongo:4.0-xenial
@@ -39,16 +45,28 @@ services:
     hostname: node1
     ports:
       - "81:3000"
+    networks:
+      - nodejs
+    volumes:
+      - ./nodejs/src:/usr/src/app/
   node2:
     build: ./nodejs
     hostname: node2
     ports:
       - "82:3000"
+    networks:
+      - nodejs
+    volumes:
+      - ./nodejs/src:/usr/src/app/
   node3:
     build: ./nodejs
     hostname: node3
     ports:
       - "83:3000"
+    networks:
+      - nodejs
+    volumes:
+      - ./nodejs/src:/usr/src/app/
   nginx:
     build: ./nginx
     container_name: "nginx"
@@ -58,12 +76,16 @@ services:
       - node1 
       - node2 
       - node3
+    networks:
+      - nodejs
   stats: 
       image: bitnami/rabbitmq
       environment:
         - RABBITMQ_NODE_TYPE=stats
         - RABBITMQ_NODE_NAME=rabbit@stats
         - RABBITMQ_ERL_COOKIE=s3cr3tc00ki3
+      networks:
+      - nodejs
       volumes:
         - 'rabbitmqstats_data:/bitnami'
   queue-disc1: 
@@ -73,6 +95,8 @@ services:
       - RABBITMQ_NODE_NAME=rabbit@queue-disc1 
       - RABBITMQ_CLUSTER_NODE_NAME=rabbit@stats 
       - RABBITMQ_ERL_COOKIE=s3cr3tc00ki3
+    networks:
+      - nodejs
     volumes: 
       - 'rabbitmqdisc1_data:/bitnami' 
     depends_on: 
@@ -108,3 +132,8 @@ volumes:
     driver: local 
   rabbitmqram1_data: 
     driver: local
+
+
+networks:
+  nodejs:
+    driver: bridge
