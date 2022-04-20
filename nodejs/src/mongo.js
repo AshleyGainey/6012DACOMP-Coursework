@@ -14,7 +14,7 @@ const bodyParser = require('body-parser');
 //Get the hostname of the node
 const os = require("os");
 var myhostname = os.hostname();
-
+//Required for RabbitMQ Messaging Queue service
 var amqp = require('amqplib/callback_api');
 
 //Holds the nodes for each host
@@ -80,13 +80,27 @@ app.post('/',  (req, res) => {
 app.listen(port, () => {
  console.log(`Express Application listening at port ` + port)
 })
+//Declare status of node, and say for the moment, that it is alive
+var status = "Alive";
+
+// Declare a variable to hold when a message from the node was last sent/received
+var timeSentReceived = new Date().getTime() / 1000;
 
 // Randomly generate a number for the node id
 var nodeID = Math.floor(Math.random() * (100 - 1 + 1) + 1);
 
+// The message, containing the hostname of the node, the status of the node, the nodeID of the node 
+//and the date of last message, that will be stored in the nodes array.
+var nodeMessage = { hostName: myhostname, status: status, nodeID: nodeID, date: timeSentReceived };
+//Put this message into the nodes array
+nodes.push(nodeMessage);
+
+//Flag to see whether the first message has been sent (used for the election - had problems - see the section for more details)
+var firstMessageSentSuccessfully = false;
+
 //Publisher Code
 setInterval(function () {
-  amqp.connect('amqp://user:bitnami@192.168.56.108', function (error0, connection) {
+  amqp.connect('amqp://user:bitnami@192.168.56.112', function (error0, connection) {
     console.log("Sending the alive message. Host Name:" + myhostname + " The Node ID:" + nodeID);
     if (error0) {
       throw error0;
@@ -97,17 +111,14 @@ setInterval(function () {
       }
 
       //Getting date and time for right now
-      let date = new Date()
-      var dateNow = date.toISOString();
-
+      timeSentReceived = new Date().getTime() / 1000;
       var exchange = 'logs';
       //Sends the host name, the status that is alive, the nodeID and the current date to the subscribers.
-      var msg = { "hostName": myhostname, "status": "alive", "nodeID": nodeID, "date": dateNow };
-
+      var msg = `{"hostName": "${myhostname}", "status":"${status}", "nodeID": ${nodeID}, "date": ${timeSentReceived}}`
       channel.assertExchange(exchange, 'fanout', {
         durable: false
       });
-      channel.publish(exchange, '', Buffer.from(JSON.stringify(msg)));
+      channel.publish(exchange, '', Buffer.from(JSON.stringify(JSON.parse(msg))));
       console.log(" [x] Sent %s", msg);
     });
 
@@ -120,7 +131,7 @@ setInterval(function () {
 
 
 //Subscriber Code
-amqp.connect('amqp://user:bitnami@192.168.56.108', function (error0, connection) {
+amqp.connect('amqp://user:bitnami@192.168.56.112', function (error0, connection) {
   console.log("In Subscriber part, awaiting for messages.");
   if (error0) {
     throw error0;
@@ -148,30 +159,26 @@ amqp.connect('amqp://user:bitnami@192.168.56.108', function (error0, connection)
         if (msg.content) {
          //When published, the subscriber will print out what has been published
           console.log('Subscriber received: ' + msg.content.toString());
+          //Update the timeSentReceived variable to the time now (it has received the message so update variable)
+          timeSentReceived = new Date().getTime() / 1000;
 
-          let hostName = JSON.parse(msg.content.toString("utf-8")).hostName
-          console.log('nodeName:' + hostName);
-          let newNodeID = JSON.parse(msg.content.toString("utf-8")).nodeID
-          console.log('newNodeID: ' + newNodeID);
-          let date = JSON.parse(msg.content.toString("utf-8")).date;
-          console.log('date' + date);
-
-          console.log(" [x] %s", msg.content.toString());
+          //Put the received message in a variable and parse it.
+          var messageReceived = JSON.parse(msg.content.toString());
 
           //Add/Replace information to the node (if already exists then replace, if not exist add to array)
-          nodes.some(node => node.hostName === hostName) ?
-            (nodes.find(e => e.hostName === hostName)).date
-            = date
-            : nodes.push({
-              "nodeID": newNodeID,
-              "hostName": hostName,
-              "status": "Alive",
-              "date": date
-            });
-
-          console.log('Replaced/Added entry to nodes array');
-        }
-        else {
+          if (nodes.some(node => node.hostName === messageReceived.hostName)) {
+            var foundNode = nodes.find(foundNodeObject => foundNodeObject.hostName === messageReceived.hostName).date = timeSentReceived;
+            if (foundNode.nodeID === messageReceived.nodeID) {
+              
+              nodes.push(messageReceived);
+            }
+          } else {
+            foundNode.nodeID = messageReceived.nodeID;
+            
+          }
+          //Has sent the first message so change the flag
+          firstMessageSentSuccessfully = true;
+        } else {
           //If there is no content, then log to the console that no message was received.
           console.log('No Message')
         }
@@ -182,193 +189,104 @@ amqp.connect('amqp://user:bitnami@192.168.56.108', function (error0, connection)
   });
 });
 
-
+//leadership election
 let systemLeader = 0;
-// let leader = 1;
-// setInterval(function () {
-
-//   //Get time now and also the epoch time
-//   let dateNow = new Date;
-//   let dateNowEpoch = new Date().getTime() / 1000;
-
-//   nodes.forEach(function (node) {
-//     let currentNodeDateConverted = new Date(node.date).getTime() / 1000;
-//     let timeBetweenNodeMessage = dateNowEpoch - currentNodeDateConverted;
-//     if (node.hostName == myhostname || timeBetweenNodeMessage > 10) {
-
-//     } else {
-//       if (node.nodeID > nodeID) {
-//         leader = 0;
-//       }
-//     }
-//   });
-
-//   sysLeader = (leader === 1) ? 1 : 0;
-// }, 5000)
-
-let maxHostName = "";
-
-// setInterval(function () {
-//   console.log(JSON.stringify(nodes));
-//   leader = 0;
-//   Object.entries(nodes).forEach(([hostname, prop]) => {
-//     console.log('hostname: ' + prop.hostName + ' prop nodeID : ' + prop.nodeID + ' prop status : ' + prop.status + ' prop date : ' + prop.date)
-//     // console.log("test" + JSON.stringify(hostname) + JSON.stringify(prop))
-//     console.log('myhostname: ' + myhostname);
-//     console.log('prop.hostName : ' + prop.hostName);
-//     if (prop.hostName != myhostname) {
-//       if (prop.nodeID > nodeID) {
-//         leader = 1;
-//         maxHostName = prop.hostName;
-//       }
-//     }
-//     if ((leader == 1)) {
-//       systemLeader = 1;
-//     }
-//   });
-
-//   console.log('SystemLeader: ' + systemLeader);
-// }, 2000);
-
-var maxNodeID = 0;
 
 setInterval(function () {
+  var maxID = 0;
   console.log('attempting to do leadership code 0');
-  console.log(JSON.stringify(nodes));
-  leader = 1;
-  activeNodes = 0;
+  // Nodes were saying they were the leader before even communicating to each other. 
+  // So when first message with content has been received (RabbitMQ has done its job!) then elect a leader
+  if (firstMessageSentSuccessfully) {
+  console.log('attempting to do leadership code 1');
   Object.entries(nodes).forEach(([hostname, prop]) => {
-    console.log('attempting to do leadership code 1');
-    console.log("test" + JSON.stringify(prop.hostName) + JSON.stringify(prop))
-    maxNodeID = nodeID;
-    if (prop.hostName != myhostname) {
       console.log('attempting to do leadership code 2');
-      if ("nodeID" in prop) {
+      if (prop.hostName != myhostname) {
         console.log('attempting to do leadership code 3');
-        activeNodes++;
-        if (prop.nodeID > nodeID) {
+        if (prop.nodeID > maxID) {
           console.log('attempting to do leadership code 4');
-          leader = 0;
+          maxID = prop.nodeID;
         }
       }
-    }
-    if ((leader == 1) && (activeNodes == nodes.length)) {
-      systemLeader = 1;
-      console.log('I am the leader');
-    }
-  });
+    });
+  }
+  //If the curent node is equal to higher than the max ID, then it is the leader!
+  if (nodeID >= maxID) {
+    systemLeader = 1;
+    console.log('I, ' + myhostname + ', am the leader');
+  }
 }, 2000);
 
-
-
-
-
-setInterval(function () {
-  if (systemLeader == 1) {
-    console.log('I am the leader');
-
-    // Get time now and also the epoch time
-    let dateNow = new Date;
-    let dateNowEpoch = new Date().getTime() / 1000;
-    console.log("--------- Each node Start ----------")
-
-    Object.entries(nodes).forEach(([hostname, prop]) => {
-      console.log("testinggggg" + JSON.stringify(hostName) + JSON.stringify(prop))
-      console.log('hostname: ' + prop.hostName + ' prop nodeID : ' + prop.nodeID + ' prop status : ' + prop.status + ' prop date : ' + prop.date)
-
-      // Get the difference between the time message was sent and the time now.
-      let currentNodeDateConverted = new Date(prop.date).getTime() / 1000;
-      let timeBetweenNodeMessage = dateNowEpoch - currentNodeDateConverted;
-
-      console.log('timeBetweenNodeMessage: ' + timeBetweenNodeMessage);
-      //If message hasn't been received for 20 seconds
-      if (timeBetweenNodeMessage < 20) {
-        console.log('No need to restart container. Sending it in the correct time');
-      } else {
-        // Will go to function to restart container
-        console.log('Need to restart container. Took more than 20 seconds');
-        restartContainer(prop);
-      }
-    });
-    console.log("--------- Each node End ----------")
-
-
-    // TODO Ash: Come back to later
-    if (dateNow.getHours() >= 16 && dateNow.getHours() <= 18) {
-      //Scale up
-    } else if (dateNow.getHours() >= 18) {
-      //Scale down
-    }
-  }
-}, 5000)
-
-
-
-
 // setInterval(function () {
-//   let maxID = -1;
-//   let maxHostName = "";
-//   leader = 0;
-//   activeNodes = 0;
+//   if (systemLeader == 1) {
+//     console.log('I am the leader');
 
+//     // Get time now and also the epoch time
+//     let dateNow = new Date;
+//     let dateNowEpoch = new Date().getTime() / 1000;
+//     console.log("--------- Each node Start ----------")
 
-//   console.log("--------- Each node Start ----------")
-//   Object.entries(nodes).forEach(([hostname, prop]) => {
-//     console.log('hostname: ' + prop.hostName + ' prop nodeID : ' + prop.nodeID + ' prop date : ' + prop.date)
-//     // Is the current node the same hostname as the saved HostName?
-//     if (prop.hostName != myhostname) {
-//       //Is the nodeID of this node higher than the one saved?
-//       if (prop.nodeID > maxID) {
-//         // Set max Id to the current one (which is the biggest so far!)
-//         maxID = prop.nodeID
-//         //Leader has been declared!
-//         leader = 1;
-//         // Set the maxhostname to the host name of the highest node
-//         maxHostName = prop.hostName;
+//     Object.entries(nodes).forEach(([hostname, prop]) => {
+//       console.log("testinggggg" + JSON.stringify(hostName) + JSON.stringify(prop))
+//       console.log('hostname: ' + prop.hostName + ' prop nodeID : ' + prop.nodeID + ' prop status : ' + prop.status + ' prop date : ' + prop.date)
+
+//       // Get the difference between the time message was sent and the time now.
+//       let currentNodeDateConverted = new Date(prop.date).getTime() / 1000;
+//       let timeBetweenNodeMessage = dateNowEpoch - currentNodeDateConverted;
+
+//       console.log('timeBetweenNodeMessage: ' + timeBetweenNodeMessage);
+//       //If message hasn't been received for 20 seconds
+//       if (timeBetweenNodeMessage < 20) {
+//         console.log('No need to restart container. Sending it in the correct time');
+//       } else {
+//         // Will go to function to restart container
+//         console.log('Need to restart container. Took more than 20 seconds');
+//         restartContainer(prop);
 //       }
-//     }
-//   });
-//   console.log("--------- Each node End ----------")
-//   //If the hostName is equal to the leader's Host Name then it is the leader
-//   if (maxHostName != myhostname && leader == 1) {
-//     console.log('I am the leader!');
-
-//
 //     });
+//     console.log("--------- Each node End ----------")
+
+
+//     // TODO Ash: Come back to later
+//     if (dateNow.getHours() >= 16 && dateNow.getHours() <= 18) {
+//       //Scale up
+//     } else if (dateNow.getHours() >= 18) {
+//       //Scale down
+//     }
 //   }
-// }, 5000);
+// }, 5000)
 
-async function restartContainer(propToRestart) {
-  let hostNameToRestart = propToRestart.hostname
-  if (leader == 1 && propToRestart.status != "Restarting") {
-    console.log("Restarting container");
-    try {
-      console.log("Stopping container: " + hostNameToRestart);
-      console.log("Stopping container (ssss): " + propToRestart.hostname);
-      //Stops the container due to the message not being delivered within 20 seconds
-      await axios.post(`http://host.docker.internal:2375/containers/${hostNameToRestart}/stop`).then(function (response) { console.log(response) });
-      console.log("Starting container: " + propToRestart.hostname);
-      // await axios.post(`http://host.docker.internal:2375/containers/create?name= ${myhostname}`, containerDetails).then(function (response) { console.log(response) });
-      // Starts the container back up again
-      await axios.post(`http://host.docker.internal:2375/containers/${hostNameToRestart}/start`).then(function (response) { console.log(response) });;
+// async function restartContainer(propToRestart) {
+//   let hostNameToRestart = propToRestart.hostname
+//   if (leader == 1 && propToRestart.status != "Restarting") {
+//     console.log("Restarting container");
+//     try {
+//       console.log("Stopping container: " + hostNameToRestart);
+//       console.log("Stopping container (ssss): " + propToRestart.hostname);
+//       //Stops the container due to the message not being delivered within 20 seconds
+//       await axios.post(`http://host.docker.internal:2375/containers/${hostNameToRestart}/stop`).then(function (response) { console.log(response) });
+//       console.log("Starting container: " + propToRestart.hostname);
+//       // await axios.post(`http://host.docker.internal:2375/containers/create?name= ${myhostname}`, containerDetails).then(function (response) { console.log(response) });
+//       // Starts the container back up again
+//       await axios.post(`http://host.docker.internal:2375/containers/${hostNameToRestart}/start`).then(function (response) { console.log(response) });;
 
-      nodes.some(node => node.hostName === hostNameToRestart) ?
-        (nodes.find(e => e.hostName === hostNameToRestart)).status
-        = "Restarting"
-        : console.log('ERRORR ASHLEY TO DO WITH RESTART NODE ARRAY (here on/around line 319')
+//       nodes.some(node => node.hostName === hostNameToRestart) ?
+//         (nodes.find(e => e.hostName === hostNameToRestart)).status
+//         = "Restarting"
+//         : console.log('ERRORR ASHLEY TO DO WITH RESTART NODE ARRAY (here on/around line 319')
 
-      console.log('Replaced entry in nodes array to say we are restarting the container');
+//       console.log('Replaced entry in nodes array to say we are restarting the container');
 
 
-      console.log("--------- Each node RESTART Start ----------")
-      Object.entries(nodes).forEach(([hostname, prop]) => {
-        console.log('hostname: ' + prop.hostName + ' prop nodeID : ' + prop.nodeID + ' prop status : ' + prop.status + ' prop date : ' + prop.date)
-      });
-      console.log("--------- Each node RESTART End ----------")
+//       console.log("--------- Each node RESTART Start ----------")
+//       Object.entries(nodes).forEach(([hostname, prop]) => {
+//         console.log('hostname: ' + prop.hostName + ' prop nodeID : ' + prop.nodeID + ' prop status : ' + prop.status + ' prop date : ' + prop.date)
+//       });
+//       console.log("--------- Each node RESTART End ----------")
 
-    }
-    catch (error) {
-      console.log(error);
-    }
-  }
-}
+//     }
+//     catch (error) {
+//       console.log(error);
+//     }
+//   }
+// }
