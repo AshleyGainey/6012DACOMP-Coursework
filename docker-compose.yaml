@@ -112,6 +112,8 @@ services:
       - 'rabbitmqram1_data:/bitnami' 
     depends_on: 
       - stats 
+    networks:
+     - nodejs 
  
   haproxy: 
     image: haproxy:1.7 
