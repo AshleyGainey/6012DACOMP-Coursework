@@ -76,16 +76,12 @@ services:
       - localmongo1 
       - localmongo2 
       - localmongo3
-    networks:
-      - nodejs
   stats: 
       image: bitnami/rabbitmq
       environment:
         - RABBITMQ_NODE_TYPE=stats
         - RABBITMQ_NODE_NAME=rabbit@stats
         - RABBITMQ_ERL_COOKIE=s3cr3tc00ki3
-      networks:
-      - nodejs
       volumes:
         - 'rabbitmqstats_data:/bitnami'
   queue-disc1: 
@@ -111,9 +107,7 @@ services:
     volumes: 
       - 'rabbitmqram1_data:/bitnami' 
     depends_on: 
-      - stats 
-    networks:
-     - nodejs 
+      - stats
  
   haproxy: 
     image: haproxy:1.7 
