@@ -169,7 +169,6 @@ amqp.connect('amqp://user:bitnami@192.168.56.112', function (error0, connection)
           //Put the received message in a variable and parse it.
           var messageReceived = JSON.parse(msg.content.toString());
 
-          console.log("MessageReceivedddddddddddd: " + messageReceived);
           //Add/Replace information to the node (if already exists then replace, if not exist add to array)
           if (nodes.some(node => node.hostName === messageReceived.hostName)) {
             var foundNode = nodes.find(foundNodeObject => foundNodeObject.hostName === messageReceived.hostName);
@@ -186,6 +185,11 @@ amqp.connect('amqp://user:bitnami@192.168.56.112', function (error0, connection)
           //If there is no content, then log to the console that no message was received.
           console.log('No Message')
         }
+        console.log("--------- Each node RESTART Start ----------")
+        Object.entries(nodes).forEach(([hostname, prop]) => {
+          console.log('hostname: ' + prop.hostName + ' prop nodeID : ' + prop.nodeID + ' prop status : ' + prop.status + ' prop date : ' + prop.date)
+        });
+        console.log("--------- Each node RESTART End ----------")
       }, {
         noAck: true
       });
@@ -198,17 +202,12 @@ let systemLeader = 0;
 
 setInterval(function () {
   var maxID = 0;
-  console.log('attempting to do leadership code 0');
   // Nodes were saying they were the leader before even communicating to each other. 
   // So when first message with content has been received (RabbitMQ has done its job!) then elect a leader
   if (firstMessageSentSuccessfully) {
-  // console.log('attempting to do leadership code 1');
-  Object.entries(nodes).forEach(([hostname, prop]) => {
-      // console.log('attempting to do leadership code 2');
-      if (prop.hostName != myhostname) {
-        // console.log('attempting to do leadership code 3');
+    Object.entries(nodes).forEach(([hostname, prop]) => {
+    if (prop.hostName != myhostname) {
         if (prop.nodeID > maxID) {
-          // console.log('attempting to do leadership code 4');
           maxID = prop.nodeID;
         }
       }
@@ -257,7 +256,8 @@ setInterval(function () {
       //The full container name is called '6012dacomp-coursework_HOSTNAME_1' (you can see the name when you do `docker_compose up`)
       var fullHostName = '6012dacomp-coursework_' + individualNode.hostName + '_1';
     console.log('Need to restart container. Took more than 10 seconds');
-      //send the create request
+    
+    //send the create request
       request(create, function (error, response) {
         if (!error) {
           //Has done all the sections in the nested calls.
@@ -280,9 +280,6 @@ setInterval(function () {
                 method: 'POST',
                 json: {}
               };
-
-
-
               request(wait, function (error, response, waitBody) {
                 if (!error) {
                   console.log("run wait complete, container will have started");

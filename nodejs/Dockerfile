@@ -1,10 +1,10 @@
 FROM alpine
 RUN apk add --update nodejs npm
-WORKDIR /nodejs/src:/usr/src/app
+WORKDIR /usr/src/app
 EXPOSE 3000
 EXPOSE 5672
 COPY src/ .
-RUN ls -la /nodejs/src:/usr/src/app/*
+RUN ls -la /usr/src/app*
 RUN npm install express
 RUN npm install mongoose
 RUN npm install request

@@ -6,10 +6,6 @@ services:
     image: mongo:4.0-xenial
     ports:
       - "40002:27017"
-    networks:
-      - nodejs
-    volumes:
-     - ./nodejs/src:/usr/src/app/
     restart: always
     entrypoint: [ "/usr/bin/mongod", "--bind_ip_all", "--replSet", "rs0" ]
   localmongo2:
@@ -19,10 +15,6 @@ services:
     ports:
       - "40003:27017"
     restart: always
-    networks:
-      - nodejs
-    volumes:
-     - ./nodejs/src:/usr/src/app/
     entrypoint: [ "/usr/bin/mongod", "--bind_ip_all", "--replSet", "rs0" ]
   localmongo3:
     hostname: localmongo3
@@ -31,10 +23,6 @@ services:
     ports:
       - "40004:27017"
     restart: always
-    networks:
-      - nodejs
-    volumes:
-      - ./nodejs/src:/usr/src/app/
     entrypoint: [ "/usr/bin/mongod", "--bind_ip_all", "--replSet", "rs0" ]
   mongosetup:
     image: mongo:4.0-xenial
@@ -51,28 +39,16 @@ services:
     hostname: node1
     ports:
       - "81:3000"
-    networks:
-      - nodejs
-    volumes:
-      - ./nodejs/src:/usr/src/app/
   node2:
     build: ./nodejs
     hostname: node2
     ports:
       - "82:3000"
-    networks:
-      - nodejs
-    volumes:
-      - ./nodejs/src:/usr/src/app/
   node3:
     build: ./nodejs
     hostname: node3
     ports:
       - "83:3000"
-    networks:
-      - nodejs
-    volumes:
-      - ./nodejs/src:/usr/src/app/
   nginx:
     build: ./nginx
     container_name: "nginx"
@@ -82,10 +58,6 @@ services:
       - localmongo1 
       - localmongo2 
       - localmongo3
-    networks:
-      - nodejs
-    volumes:
-     - ./nodejs/src:/usr/src/app/
   stats: 
       image: bitnami/rabbitmq
       environment:
@@ -136,8 +108,3 @@ volumes:
     driver: local 
   rabbitmqram1_data: 
     driver: local
-
-
-networks:
-  nodejs:
-    driver: bridge
