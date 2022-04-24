@@ -20,6 +20,16 @@ var amqp = require('amqplib/callback_api');
 //Holds the nodes for each host
 var nodes = [];
 
+
+//leadership election
+let systemLeader = 0;
+
+//Used to see if the system scaled up yet
+var scaledUpYet = false;
+
+//Used to store the host Names of node 4 and node 5
+var node4HostName = null
+var node5HostName = null
 //instance of express and port to use for inbound connections.
 const app = express()
 const port = 3000
@@ -197,9 +207,6 @@ amqp.connect('amqp://user:bitnami@192.168.56.112', function (error0, connection)
   });
 });
 
-//leadership election
-let systemLeader = 0;
-
 setInterval(function () {
   var maxID = 0;
   // Nodes were saying they were the leader before even communicating to each other. 
@@ -229,6 +236,7 @@ var create = {
   json: { "Image": "alpine", "Cmd": ["echo", "Docker API have now created a new container!"] }
 };
 
+//Check to see if any node has died Section
 setInterval(function () {
   var deadNode = null;
   //Check to see if any node...
@@ -249,7 +257,7 @@ setInterval(function () {
       console.log(deadNode.hostName + " is dead and has been removed from the nodes array.");
     }
 
-    if (systemLeader && deadNode != null) {
+    if (systemLeader == 1 && deadNode != null) {
       //Don't call this if statement until the dead node has been created by making deadNode to null.
       deadNode = null;
 
@@ -306,17 +314,45 @@ setInterval(function () {
   }
   });
 }, 10000);
-// setInterval(function () {
-//   if (systemLeader == 1) {
-//     // TODO Ash: Come back to later
-//     if (dateNow.getHours() >= 16 && dateNow.getHours() <= 18) {
-//       //Scale up
-//Create a new Random nodeID (between 101 and 1000 - so not to get conflicts with the random ID that were being set).
-// let range = { min: 101, max: 1000 }
-// let delta = range.max - range.min
-// const randomID = Math.round(range.min + Math.random() * delta)
-//     } else if (dateNow.getHours() >= 18) {
-//       //Scale down
-//     }
-//   }
-// }, 5000)
+
+// Peak Hours section
+setInterval(function () {
+  //If it is the system leader then do this piece of code.
+  if (systemLeader == 1) {
+    //Get the current hour of now.
+    var currentHour = new Date().getHours();
+    //The 3 current containers have 1-100. The two new containers will have an ID between 101-1000 so they don't have clash with the others
+    let range = { min: 101, max: 1000 };
+    let delta = range.max - range.min;
+    node4HostName = Math.round(range.min + Math.random() * delta);
+    node5HostName = Math.round(range.min + Math.random() * delta);
+
+    console.log("Node4HostName:" + node4HostName);
+    console.log("Node5HostName:" + node5HostName);
+
+    //scaledUpYet prevents this code from being executed twice and spinning up more than 2 containers
+    //If Current Hour is between 16:00 and 18:00
+    if (!scaledUpYet && currentHour > 16 && currentHour < 18) {
+      console.log("Peak hours has started. 2 New containers are being created and started");
+
+      //Scale up (code comes here Ashley)
+
+      //Has now been scaled up so set flag to true
+      scaledUpYet = true;
+    }
+    //If Current Hour is not between 16:00 and 18:00 and hasn't been scaled up yet.
+    if (!scaledUpYet && currentHour < 16 && currentHour > 18) {
+      if (node4HostName != null && node5HostName != null) {
+        console.log("Peak hours has ended. Killing the new containers we spun up before");
+        //Kill and remove the containers that have the hostname stored in node4HostName and node5HostName
+        //Scale down(code comes here Ashley)
+
+        //Set scaled up yet flag to false, as it has now been scaled down 
+        scaledUpYet = false;
+      } else {
+        //Got into the wrong state (should never happen but has been put in for debugging proposes)
+        console.log("Node4 and Node5 haven't been set and therefore cannot be scaled down.")
+      }
+    }
+  }
+}, 5000);
