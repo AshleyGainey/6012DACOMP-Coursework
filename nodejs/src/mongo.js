@@ -326,20 +326,17 @@ setInterval(function () {
   });
 }, 10000);
 
-// Peak Hours section
+// Peak Hours section (check every 60 seconds)
 setInterval(function () {
   //If it is the system leader then do this piece of code.
   if (systemLeader == 1) {
     //Get the current hour of now.
     var currentHour = new Date().getHours();
+
     //The 3 current containers have 1-100. The two new containers will have an ID between 101-1000 so they don't have clash with the others
     let range = { min: 101, max: 1000 };
     let delta = range.max - range.min;
-    node4HostName = Math.round(range.min + Math.random() * delta);
-    node5HostName = Math.round(range.min + Math.random() * delta);
 
-    console.log("Node4HostName:" + node4HostName);
-    console.log("Node5HostName:" + node5HostName);
 
     //scaledUpYet prevents this code from being executed twice and spinning up more than 2 containers
     //If Current Hour is between 16:00 and 18:00
@@ -353,12 +350,123 @@ setInterval(function () {
     }
     //If Current Hour is not between 16:00 and 18:00 and hasn't been scaled up yet.
     if (!scaledUpYet && currentHour < 16 && currentHour > 18) {
+      node4HostName = Math.round(range.min + Math.random() * delta);
+      node5HostName = Math.round(range.min + Math.random() * delta);
+
+      console.log("Node4HostName:" + node4HostName);
+      console.log("Node5HostName:" + node5HostName);
       if (node4HostName != null && node5HostName != null) {
         console.log("Peak hours has ended. Killing the new containers we spun up before");
         //Kill and remove the containers that have the hostname stored in node4HostName and node5HostName
-        //Scale down(code comes here Ashley)
+        //Scale Up(code comes here Ashley)
+        var fullHostName4 = '6012dacomp-coursework_' + node4HostName + '_1';
+        var fullHostName5 = '6012dacomp-coursework_' + node4HostName + '_1';
 
-        //Set scaled up yet flag to false, as it has now been scaled down 
+        create = {
+          uri: url + "/v1.40/containers/create",
+          method: 'POST',
+          data: { "Image": "alpine", "Cmd": ["pm2-runtime", "mongo.js"], "Name": fullHostName4 }
+        };
+
+        request(create, function (error, response) {
+          if (!error) {
+            //Has done all the sections in the nested calls.
+            // console.log("Created container " + JSON.stringify(individualNode));
+
+            //post object for the container start request
+            var start = {
+              uri: url + "/v1.40/containers/" + fullHostName4 + "/start",
+              method: 'POST',
+              json: {}
+            };
+
+            //send the start request
+            request(start, function (error, response) {
+              if (!error) {
+                console.log("Container start completed");
+                //post object for wait. Wait until the container has been created
+                var wait = {
+                  uri: url + "/v1.40/containers/" + fullHostName4 + "/wait",
+                  method: 'POST',
+                  json: {}
+                };
+                request(wait, function (error, response, waitBody) {
+                  if (!error) {
+                    console.log("run wait complete, container will have started");
+                    //send a simple get request for stdout from the container
+                    request.get({
+                      url: url + "/v1.40/containers/" + fullHostName4 + "/logs?stdout=1",
+                    }, (err, res, data) => {
+                      if (err) {
+                        console.log('Error:', err);
+                      }
+                      else if (res.statusCode !== 200) {
+                        console.log('Status:', res.statusCode);
+                      } else {
+                        //we need to parse the json response to access
+                        console.log("Container stdout = " + data);
+                      }
+                    });
+                  }
+                });
+              }
+            });
+          }
+        });
+
+        create = {
+          uri: url + "/v1.40/containers/create",
+          method: 'POST',
+          data: { "Image": "alpine", "Cmd": ["pm2-runtime", "mongo.js"], "Name": fullHostName5 }
+        };
+
+        request(create, function (error, response) {
+          if (!error) {
+            //Has done all the sections in the nested calls.
+            // console.log("Created container " + JSON.stringify(individualNode));
+
+            //post object for the container start request
+            var start = {
+              uri: url + "/v1.40/containers/" + fullHostName4 + "/start",
+              method: 'POST',
+              json: {}
+            };
+
+            //send the start request
+            request(start, function (error, response) {
+              if (!error) {
+                console.log("Container start completed");
+                //post object for wait. Wait until the container has been created
+                var wait = {
+                  uri: url + "/v1.40/containers/" + fullHostName4 + "/wait",
+                  method: 'POST',
+                  json: {}
+                };
+                request(wait, function (error, response, waitBody) {
+                  if (!error) {
+                    console.log("run wait complete, container will have started");
+                    //send a simple get request for stdout from the container
+                    request.get({
+                      url: url + "/v1.40/containers/" + fullHostName4 + "/logs?stdout=1",
+                    }, (err, res, data) => {
+                      if (err) {
+                        console.log('Error:', err);
+                      }
+                      else if (res.statusCode !== 200) {
+                        console.log('Status:', res.statusCode);
+                      } else {
+                        //we need to parse the json response to access
+                        console.log("Container stdout = " + data);
+                      }
+                    });
+                  }
+                });
+              }
+            });
+          }
+        });
+
+        //Set scaled up yet flag to false, as it has now been scaled up 
         scaledUpYet = false;
       } else {
         //Got into the wrong state (should never happen but has been put in for debugging proposes)
@@ -366,4 +474,4 @@ setInterval(function () {
       }
     }
   }
-}, 5000);
+}, 60000);
