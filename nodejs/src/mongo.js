@@ -198,13 +198,13 @@ setInterval(function () {
   // Nodes were saying they were the leader before even communicating to each other. 
   // So when first message with content has been received (RabbitMQ has done its job!) then elect a leader
   if (firstMessageSentSuccessfully) {
-  console.log('attempting to do leadership code 1');
+  // console.log('attempting to do leadership code 1');
   Object.entries(nodes).forEach(([hostname, prop]) => {
-      console.log('attempting to do leadership code 2');
+      // console.log('attempting to do leadership code 2');
       if (prop.hostName != myhostname) {
-        console.log('attempting to do leadership code 3');
+        // console.log('attempting to do leadership code 3');
         if (prop.nodeID > maxID) {
-          console.log('attempting to do leadership code 4');
+          // console.log('attempting to do leadership code 4');
           maxID = prop.nodeID;
         }
       }
@@ -220,7 +220,7 @@ setInterval(function () {
 
 
 setInterval(function () {
-  var isDeadNode = false;
+  var deadNode = null;
   //Check to see if any node...
   Object.entries(nodes).forEach(([hostName, individualNode]) => {
     //...hasn't sent a message in 10 or more seconds
@@ -234,48 +234,179 @@ setInterval(function () {
       //Not alive so it means it is dead and therefore, remove from the nodes array. 
       nodes.splice(hostName, 1);
       //And set is there a dead node to true
-      isDeadNode = true;
+      deadNode = individualNode;
       //Output a message to the console that that node is dead.
-      console.log(individualNode.hostName + " is dead and has been removed from the nodes array.");
+      console.log(deadNode.hostName + " is dead and has been removed from the nodes array.");
     }
-  });
-  if (systemLeader && isDeadNode) {
+
+    if (systemLeader && deadNode != null) {
+      deadNode = null;
     //Create a new Random nodeID (between 101 and 1000 - so not to get conflicts with the random ID that were being set).
     let range = { min: 101, max: 1000 }
     let delta = range.max - range.min
     const randomID = Math.round(range.min + Math.random() * delta)
 
     console.log('Need to restart container. Took more than 10 seconds');
+      //send the create request
+      request(create, function (error, response) {
+        console.log('Doing Creating Code: 1');
+        if (!error) {
+          console.log('Doing Creating Code: 2');
+          console.log("Created container " + JSON.stringify(individualNode));
 
-    //Create the container details
-    var hostAndNodeID = "node" + randomID;
-    const containerDetails = {
-      Image: "6012dacomp-coursework_node1",
-      Hostname: hostAndNodeID,
-      NetworkingConfig: {
-        EndpointsConfig: {
-          // Need to change this Ashley
-          "6012dacomp-coursework_nodejs": {},
-        },
-      },
-    };
-    makeStartNewContainer(hostAndNodeID, containerDetails);
+          //post object for the container start request
+          var start = {
+            uri: url + "/v1.40/containers/" + deadNode.hostName + "/start",
+            method: 'POST',
+            json: {}
+          };
+          console.log('Doing Creating Code: 3');
+
+          //send the start request
+          request(start, function (error, response) {
+            console.log('Doing Creating Code: 4');
+            if (!error) {
+              console.log('Doing Creating Code: 5');
+              console.log("Container start completed");
+              //post object for  wait 
+              var wait = {
+                uri: url + "/v1.40/containers/" + individualNode.hostName + "/wait",
+                method: 'POST',
+                json: {}
+              };
+              console.log('Doing Creating Code: 6');
+
+
+
+              request(wait, function (error, response, waitBody) {
+                if (!error) {
+                  console.log('Doing Creating Code: 7');
+
+                  console.log("run wait complete, container will have started");
+
+                  //send a simple get request for stdout from the container
+                  request.get({
+                    url: url + "/v1.40/containers/" + individualNode.hostName + "/logs?stdout=1",
+                  }, (err, res, data) => {
+                    if (err) {
+                      console.log('Doing Creating Code: 8');
+                      console.log('Error:', err);
+                    } else if (res.statusCode !== 200) {
+                      console.log('Status:', res.statusCode);
+                    } else {
+                      //we need to parse the json response to access
+                      console.log("Container stdout = " + data);
+                      console.log('Doing Creating Code: 9');
+                      containerQty();
+                    }
+                    console.log('Out of Loop Code: 001');
+                  });
+                  console.log('Out of Loop Code: 002');
+                }
+                else {
+                  console.log('Else code 101');
+                }
+                console.log('Doing Creating Code: 003');
+              });
+              console.log('Doing Creating Code: 004');
+            }
+            else {
+              console.log('Else code 201');
+            }
+            console.log('Doing Creating Code: 005');
+          });
+          console.log('Doing Creating Code: 006');
+        }
+        else {
+          console.log('Else code 301');
+        }
+        console.log('Doing Creating Code: 007');
+      });
   }
+  });
+
+
+
+
+
+
+
+
+
+
+
+
+
+    // //Create the container details
+    // var hostAndNodeID = "node" + randomID;
+    // const containerDetails = {
+    //   Image: "6192.168.56.112_node1",
+    //   Hostname: hostAndNodeID,
+    //   NetworkingConfig: {
+    //     EndpointsConfig: {
+    //       // Need to change this Ashley
+    //       "6192.168.56.112_nodejs": {},
+    //     },
+    //   },
+    // };
+    // makeStartNewContainer(hostAndNodeID, containerDetails);
 }, 10000);
 
 
-async function makeStartNewContainer(hostName, containerDetails) {
-  try {
-    console.log(`Attempting to start container: ${hostName}`);
-    console.log("Creating container: " + hostName);
+// async function makeStartNewContainer(hostName, containerDetails) {
+//   try {
+//     console.log(`Attempting to start container: ${hostName}`);
+//     console.log("Creating container: " + hostName);
 
-    await axios.post(`http://host.docker.internal:2375/containers/create?name=${hostName}`, containerDetails).then(function (response) { console.log(response) });
-    console.log("Starting container: " + hostName);
-    await axios.post(`http://host.docker.internal:2375/containers/${hostName}/start`);
-  } catch (error) {
-    console.log(error);
-  }
-}
+//     await axios.post(`http://host.docker.internal:2375/containers/create?name=${hostName}`, containerDetails).then(function (response) { console.log(response) });
+//     console.log("Starting container: " + hostName);
+//     await axios.post(`http://host.docker.internal:2375/containers/${hostName}/start`);
+//   } catch (error) {
+//     console.log(error);
+//   }
+// }
+
+
+
+//import the request library
+var request = require('request');
+
+//This is the URL endopint of your vm running docker
+var url = 'http://192.168.56.112:2375';
+
+
+//this uses the simple get request from request
+//
+
+
+// function containerQty() {
+//   request.get({
+//     //we are using the /info url to get the base docker information
+//     url: url + "/info",
+//   }, (err, res, data) => {
+//     if (err) {
+//       console.log('Error:', err);
+//     } else if (res.statusCode !== 200) {
+//       console.log('Status:', res.statusCode);
+//     } else {
+//       //we need to parse the json response to access
+//       data = JSON.parse(data)
+//       console.log("Number of Containers = " + data.Containers);
+//     }
+//   });
+// }
+
+// containerQty();
+
+//create the post object to send to the docker api to create a container
+var create = {
+  uri: url + "/v1.40/containers/create",
+  method: 'POST',
+  //deploy an alpine container that runs echo hello world
+  json: { "Image": "alpine", "Cmd": ["echo", "hello world from LJMU cloud computing"] }
+};
+
+
 
 
 
