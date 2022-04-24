@@ -53,10 +53,12 @@ app.use(bodyParser.json());
 //connect to the cluster
 mongoose.connect(connectionString, {useNewUrlParser: true, useUnifiedTopology: true});
 
-
+//For mongoose to make a connection and if it fails, print out a message to the console
 var db = mongoose.connection;
 db.on('error', console.error.bind(console, 'MongoDB connection error:'));
 
+
+//Make a mongoose schema
 var Schema = mongoose.Schema;
 
 //Structure of the assignment schema
@@ -70,7 +72,7 @@ var notFlixSchema = new Schema({
   pointOfInteraction: String,
   typeOfInteraction: String
 });
-
+//Model that schema
 var notFlixModel = mongoose.model('Interactions', notFlixSchema, 'interactions');
 
 //Deal with the get request by sending back all of the information
@@ -112,14 +114,16 @@ nodes.push(nodeMessage);
 //Flag to see whether the first message has been sent (used for the election - had problems - see the section for more details)
 var firstMessageSentSuccessfully = false;
 
-//Publisher Code
+//Publisher Code - Every 2 seconds publish a message saying that the node is alive
 setInterval(function () {
   amqp.connect('amqp://user:bitnami@192.168.56.112', function (error0, connection) {
     console.log("Sending the alive message. Host Name:" + myhostname + " The Node ID:" + nodeID);
+    //If an error with RabbitMQ (e.g not started for example), don't continue and just show the error code
     if (error0) {
       throw error0;
     }
     connection.createChannel(function (error1, channel) {
+      //If an error while creating the channel, don't continue and just show the error code
       if (error1) {
         throw error1;
       }
@@ -144,13 +148,15 @@ setInterval(function () {
 }, 2000);
 
 
-//Subscriber Code
+//Subscriber Code - Receives messages that is coming from other nodes
 amqp.connect('amqp://user:bitnami@192.168.56.112', function (error0, connection) {
   console.log("In Subscriber part, awaiting for messages.");
+  //If an error with RabbitMQ (e.g not started for example), don't continue and just show the error code
   if (error0) {
     throw error0;
   }
   connection.createChannel(function (error1, channel) {
+    //If an error while creating the channel, don't continue and just show the error code
     if (error1) {
       throw error1;
     }
@@ -163,12 +169,14 @@ amqp.connect('amqp://user:bitnami@192.168.56.112', function (error0, connection)
     channel.assertQueue('', {
       exclusive: true
     }, function (error2, q) {
+      //If an error, don't continue and just show the error code
       if (error2) {
         throw error2;
       }
       console.log(" [*] Waiting for messages in %s. To exit press CTRL+C", q.queue);
       channel.bindQueue(q.queue, exchange, '');
 
+      //Consume the message has that been received by the node
       channel.consume(q.queue, function (msg) {
         if (msg.content) {
          //When published, the subscriber will print out what has been published
@@ -179,7 +187,7 @@ amqp.connect('amqp://user:bitnami@192.168.56.112', function (error0, connection)
           //Put the received message in a variable and parse it.
           var messageReceived = JSON.parse(msg.content.toString());
 
-          //Add/Replace information to the node (if already exists then replace, if not exist add to array)
+          //Add/Replace information to the node array (if already exists then replace the date (and if the node is not the same then replace the node)), if not exist add to array)
           if (nodes.some(node => node.hostName === messageReceived.hostName)) {
             var foundNode = nodes.find(foundNodeObject => foundNodeObject.hostName === messageReceived.hostName);
             foundNode.date = timeSentReceived;
@@ -187,19 +195,21 @@ amqp.connect('amqp://user:bitnami@192.168.56.112', function (error0, connection)
               foundNode.nodeID = messageReceived.nodeID;
             }
           } else {
+            //Add the information consumed to the node array
             nodes.push(messageReceived);
           }
-          //Has sent the first message so change the flag
+          //RabbitMQ has sent the first message so change the flag
           firstMessageSentSuccessfully = true;
         } else {
           //If there is no content, then log to the console that no message was received.
           console.log('No Message')
         }
-        console.log("--------- Each node RESTART Start ----------")
+        //Print out all the nodes that are correctly in the nodes array (aka the nodes that are currently alive/or less than 10 seconds dead)
+        console.log("--------- Nodes array print out Start ----------")
         Object.entries(nodes).forEach(([hostname, prop]) => {
           console.log('hostname: ' + prop.hostName + ' prop nodeID : ' + prop.nodeID + ' prop status : ' + prop.status + ' prop date : ' + prop.date)
         });
-        console.log("--------- Each node RESTART End ----------")
+        console.log("--------- Nodes array print out  End ----------")
       }, {
         noAck: true
       });
@@ -208,6 +218,7 @@ amqp.connect('amqp://user:bitnami@192.168.56.112', function (error0, connection)
 });
 
 setInterval(function () {
+  //Store the MaxID in a variable
   var maxID = 0;
   // Nodes were saying they were the leader before even communicating to each other. 
   // So when first message with content has been received (RabbitMQ has done its job!) then elect a leader
