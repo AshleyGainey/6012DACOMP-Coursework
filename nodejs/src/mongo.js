@@ -120,7 +120,10 @@ setInterval(function () {
     console.log("Sending the alive message. Host Name:" + myhostname + " The Node ID:" + nodeID);
     //If an error with RabbitMQ (e.g not started for example), don't continue and just show the error code
     if (error0) {
+      firstMessageSentSuccessfully = false;
       throw error0;
+    } else {
+      firstMessageSentSuccessfully = true;
     }
     connection.createChannel(function (error1, channel) {
       //If an error while creating the channel, don't continue and just show the error code
@@ -199,7 +202,7 @@ amqp.connect('amqp://user:bitnami@192.168.56.112', function (error0, connection)
             nodes.push(messageReceived);
           }
           //RabbitMQ has sent the first message so change the flag
-          firstMessageSentSuccessfully = true;
+          // firstMessageSentSuccessfully = true;
         } else {
           //If there is no content, then log to the console that no message was received.
           console.log('No Message')
@@ -282,18 +285,18 @@ setInterval(function () {
           //Has done all the sections in the nested calls.
           console.log("Created container " + JSON.stringify(individualNode));
 
-          //post object for the container start request
+          //Object for the starting of container request
           var start = {
             uri: url + "/v1.40/containers/" + fullHostName + "/start",
             method: 'POST',
             json: {}
           };
 
-          //send the start request
+          //Send the start request to start the container
           request(start, function (error, response) {
             if (!error) {
               console.log("Container start completed");
-              //post object for wait. Wait until the container has been created
+              //post object for wait. Wait until the container has been created first
               var wait = {
                 uri: url + "/v1.40/containers/" + fullHostName + "/wait",
                 method: 'POST',
@@ -302,7 +305,7 @@ setInterval(function () {
               request(wait, function (error, response, waitBody) {
                 if (!error) {
                   console.log("run wait complete, container will have started");
-                  //send a simple get request for stdout from the container
+                  //send a get request for stdout from the container
                   request.get({
                     url: url + "/v1.40/containers/" + fullHostName + "/logs?stdout=1",
                   }, (err, res, data) => {
@@ -333,6 +336,7 @@ setInterval(function () {
     //Get the current hour of now.
     var currentHour = new Date().getHours();
 
+    // var currentHour = 17;
     //The 3 current containers have 1-100. The two new containers will have an ID between 101-1000 so they don't have clash with the others
     let range = { min: 101, max: 1000 };
     let delta = range.max - range.min;
@@ -344,7 +348,112 @@ setInterval(function () {
       console.log("Peak hours has started. 2 New containers are being created and started");
 
       //Scale up (code comes here Ashley)
+      var fullHostName4 = '6012dacomp-coursework_' + node4HostName + '_1';
+      var fullHostName5 = '6012dacomp-coursework_' + node4HostName + '_1';
 
+      create = {
+        uri: url + "/v1.40/containers/create",
+        method: 'POST',
+        data: { "Image": "alpine", "Cmd": ["pm2-runtime", "mongo.js"], "Name": fullHostName4 }
+      };
+
+      request(create, function (error, response) {
+        if (!error) {
+          //Has done all the sections in the nested calls.
+          // console.log("Created container " + JSON.stringify(individualNode));
+
+          //post object for the container start request
+          var start = {
+            uri: url + "/v1.40/containers/" + fullHostName4 + "/start",
+            method: 'POST',
+            json: {}
+          };
+
+          //send the start request
+          request(start, function (error, response) {
+            if (!error) {
+              console.log("Container start completed");
+              //post object for wait. Wait until the container has been created first
+              var wait = {
+                uri: url + "/v1.40/containers/" + fullHostName4 + "/wait",
+                method: 'POST',
+                json: {}
+              };
+              request(wait, function (error, response, waitBody) {
+                if (!error) {
+                  console.log("run wait complete, container will have started");
+                  //send a get request for stdout from the container
+                  request.get({
+                    url: url + "/v1.40/containers/" + fullHostName4 + "/logs?stdout=1",
+                  }, (err, res, data) => {
+                    if (err) {
+                      console.log('Error:', err);
+                    }
+                    else if (res.statusCode !== 200) {
+                      console.log('Status:', res.statusCode);
+                    } else {
+                      //we need to parse the json response to access
+                      console.log("Container stdout = " + data);
+                    }
+                  });
+                }
+              });
+            }
+          });
+        }
+      });
+
+      create = {
+        uri: url + "/v1.40/containers/create",
+        method: 'POST',
+        data: { "Image": "alpine", "Cmd": ["pm2-runtime", "mongo.js"], "Name": fullHostName5 }
+      };
+
+      request(create, function (error, response) {
+        if (!error) {
+          //Has done all the sections in the nested calls.
+          // console.log("Created container " + JSON.stringify(individualNode));
+
+          //post object for the container start request
+          var start = {
+            uri: url + "/v1.40/containers/" + fullHostName4 + "/start",
+            method: 'POST',
+            json: {}
+          };
+
+          //send the start request
+          request(start, function (error, response) {
+            if (!error) {
+              console.log("Container start completed");
+              //post object for wait. Wait until the container has been created
+              var wait = {
+                uri: url + "/v1.40/containers/" + fullHostName4 + "/wait",
+                method: 'POST',
+                json: {}
+              };
+              request(wait, function (error, response, waitBody) {
+                if (!error) {
+                  console.log("run wait complete, container will have started");
+                  //send a simple get request for stdout from the container first
+                  request.get({
+                    url: url + "/v1.40/containers/" + fullHostName4 + "/logs?stdout=1",
+                  }, (err, res, data) => {
+                    if (err) {
+                      console.log('Error:', err);
+                    }
+                    else if (res.statusCode !== 200) {
+                      console.log('Status:', res.statusCode);
+                    } else {
+                      //we need to parse the json response to access
+                      console.log("Container stdout = " + data);
+                    }
+                  });
+                }
+              });
+            }
+          });
+        }
+      });
       //Has now been scaled up so set flag to true
       scaledUpYet = true;
     }
@@ -358,111 +467,45 @@ setInterval(function () {
       if (node4HostName != null && node5HostName != null) {
         console.log("Peak hours has ended. Killing the new containers we spun up before");
         //Kill and remove the containers that have the hostname stored in node4HostName and node5HostName
-        //Scale Up(code comes here Ashley)
-        var fullHostName4 = '6012dacomp-coursework_' + node4HostName + '_1';
-        var fullHostName5 = '6012dacomp-coursework_' + node4HostName + '_1';
+        //Scale Down(code comes here Ashley)
 
-        create = {
-          uri: url + "/v1.40/containers/create",
-          method: 'POST',
-          data: { "Image": "alpine", "Cmd": ["pm2-runtime", "mongo.js"], "Name": fullHostName4 }
+         //Get the full Container name
+        var fullHostName4 = '6012dacomp-coursework_' + node4HostName + '_1';
+
+        //Make an object to stop the container
+        stopHostName4 = {
+          uri: url + "/v1.40/containers/" + node4HostName + "/stop",
+          method: 'POST'
         };
 
-        request(create, function (error, response) {
-          if (!error) {
-            //Has done all the sections in the nested calls.
-            // console.log("Created container " + JSON.stringify(individualNode));
-
-            //post object for the container start request
-            var start = {
-              uri: url + "/v1.40/containers/" + fullHostName4 + "/start",
-              method: 'POST',
-              json: {}
-            };
-
-            //send the start request
-            request(start, function (error, response) {
-              if (!error) {
-                console.log("Container start completed");
-                //post object for wait. Wait until the container has been created
-                var wait = {
-                  uri: url + "/v1.40/containers/" + fullHostName4 + "/wait",
-                  method: 'POST',
-                  json: {}
-                };
-                request(wait, function (error, response, waitBody) {
-                  if (!error) {
-                    console.log("run wait complete, container will have started");
-                    //send a simple get request for stdout from the container
-                    request.get({
-                      url: url + "/v1.40/containers/" + fullHostName4 + "/logs?stdout=1",
-                    }, (err, res, data) => {
-                      if (err) {
-                        console.log('Error:', err);
-                      }
-                      else if (res.statusCode !== 200) {
-                        console.log('Status:', res.statusCode);
-                      } else {
-                        //we need to parse the json response to access
-                        console.log("Container stdout = " + data);
-                      }
-                    });
-                  }
-                });
-              }
-            });
+        // Do the request of stopping the container
+        request(stopHostName4, function (error, response, stop) {
+          if (error) {
+            //If error then display the error
+            console.log("Error while killing the container:" + node5HostName + " --- Status Code:" + response.statusCode);
+          } else {
+            //If no error, then display the success message
+            console.log("Killed the container:" + node4HostName);
           }
         });
 
-        create = {
-          uri: url + "/v1.40/containers/create",
-          method: 'POST',
-          data: { "Image": "alpine", "Cmd": ["pm2-runtime", "mongo.js"], "Name": fullHostName5 }
+ //Get the full Container name
+        var fullHostName5 = '6012dacomp-coursework_' + node5HostName + '_1';
+
+        //Make an object to stop the container
+        stopHostName5 = {
+          uri: url + "/v1.40/containers/" + fullHostName5 + "/stop",
+          method: 'POST'
         };
 
-        request(create, function (error, response) {
-          if (!error) {
-            //Has done all the sections in the nested calls.
-            // console.log("Created container " + JSON.stringify(individualNode));
-
-            //post object for the container start request
-            var start = {
-              uri: url + "/v1.40/containers/" + fullHostName4 + "/start",
-              method: 'POST',
-              json: {}
-            };
-
-            //send the start request
-            request(start, function (error, response) {
-              if (!error) {
-                console.log("Container start completed");
-                //post object for wait. Wait until the container has been created
-                var wait = {
-                  uri: url + "/v1.40/containers/" + fullHostName4 + "/wait",
-                  method: 'POST',
-                  json: {}
-                };
-                request(wait, function (error, response, waitBody) {
-                  if (!error) {
-                    console.log("run wait complete, container will have started");
-                    //send a simple get request for stdout from the container
-                    request.get({
-                      url: url + "/v1.40/containers/" + fullHostName4 + "/logs?stdout=1",
-                    }, (err, res, data) => {
-                      if (err) {
-                        console.log('Error:', err);
-                      }
-                      else if (res.statusCode !== 200) {
-                        console.log('Status:', res.statusCode);
-                      } else {
-                        //we need to parse the json response to access
-                        console.log("Container stdout = " + data);
-                      }
-                    });
-                  }
-                });
-              }
-            });
+         // Do the request of stopping the container
+        request(stopHostName5, function (error, response, stop) {
+          if (error) {
+            //If error then display the error
+            console.log("Error while killing the container:" + node5HostName + " --- Status Code:" + response.statusCode);
+          } else {
+                        //If no error, then display the success message
+            console.log("Killed the container:" + node5HostName);
           }
         });
 
