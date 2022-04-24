@@ -15,8 +15,6 @@ Features:
 
 [x] Automatically adjust for failed containers
 
-     --- NOTE: partially implementated. - Receiving refusing to connect.
-
 [] Auto Scaling between 16:00 - 18:00
      
      --- NOTE: partially implementated.

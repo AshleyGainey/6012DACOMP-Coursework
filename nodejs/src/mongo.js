@@ -24,7 +24,11 @@ var nodes = [];
 const app = express()
 const port = 3000
 
-const axios = require("axios");
+//import the request library
+var request = require('request');
+
+//This is the URL endpoint of the vm for the docker API calls
+var url = 'http://192.168.56.112:2375';
 
 //connection string listing the mongo servers. This is an alternative to using a load balancer. THIS SHOULD BE DISCUSSED IN YOUR ASSIGNMENT.
 const connectionString = 'mongodb://localmongo1:27017,localmongo2:27017,localmongo3:27017/notFlixDB?replicaSet=rs0';
@@ -218,6 +222,13 @@ setInterval(function () {
 }, 2000);
 
 
+//create the post object to send to the docker api to create a container
+var create = {
+  uri: url + "/v1.40/containers/create",
+  method: 'POST',
+  //deploy an alpine container that prints out that it has been created
+  json: { "Image": "alpine", "Cmd": ["echo", "Docker API have now created a new container!"] }
+};
 
 setInterval(function () {
   var deadNode = null;
@@ -242,56 +253,44 @@ setInterval(function () {
     if (systemLeader && deadNode != null) {
       //Don't call this if statement until the dead node has been created by making deadNode to null.
       deadNode = null;
-    //Create a new Random nodeID (between 101 and 1000 - so not to get conflicts with the random ID that were being set).
-    let range = { min: 101, max: 1000 }
-    let delta = range.max - range.min
-    const randomID = Math.round(range.min + Math.random() * delta)
-      // var hello = "node" + randomID;
-      var hostName = '6012dacomp-coursework_' + individualNode.hostName + '_1';
+
+      //The full container name is called '6012dacomp-coursework_HOSTNAME_1' (you can see the name when you do `docker_compose up`)
+      var fullHostName = '6012dacomp-coursework_' + individualNode.hostName + '_1';
     console.log('Need to restart container. Took more than 10 seconds');
       //send the create request
       request(create, function (error, response) {
-        console.log('Doing Creating Code: 1');
         if (!error) {
-          console.log('Doing Creating Code: 2');
-          // console.log("Created container " + JSON.stringify(individualNode));
+          //Has done all the sections in the nested calls.
+          console.log("Created container " + JSON.stringify(individualNode));
 
           //post object for the container start request
           var start = {
-            uri: url + "/v1.40/containers/" + hostName + "/start",
+            uri: url + "/v1.40/containers/" + fullHostName + "/start",
             method: 'POST',
             json: {}
           };
-          console.log('Doing Creating Code: 3');
 
           //send the start request
           request(start, function (error, response) {
-            console.log('Doing Creating Code: 4');
             if (!error) {
-              console.log('Doing Creating Code: 5');
               console.log("Container start completed");
-              //post object for  wait 
+              //post object for wait. Wait until the container has been created
               var wait = {
-                uri: url + "/v1.40/containers/" + hostName + "/wait",
+                uri: url + "/v1.40/containers/" + fullHostName + "/wait",
                 method: 'POST',
                 json: {}
               };
-              console.log('Doing Creating Code: 6');
 
 
 
               request(wait, function (error, response, waitBody) {
                 if (!error) {
-                  console.log('Doing Creating Code: 7');
-
                   console.log("run wait complete, container will have started");
-
                   //send a simple get request for stdout from the container
                   request.get({
-                    url: url + "/v1.40/containers/" + hostName + "/logs?stdout=1",
+                    url: url + "/v1.40/containers/" + fullHostName + "/logs?stdout=1",
                   }, (err, res, data) => {
                     if (err) {
-                      console.log('Doing Creating Code: 8');
                       console.log('Error:', err);
                     }
                     else if (res.statusCode !== 200) {
@@ -299,142 +298,26 @@ setInterval(function () {
                     } else {
                       //we need to parse the json response to access
                       console.log("Container stdout = " + data);
-                      console.log('Doing Creating Code: 9');
-                      containerQty();
                     }
-                    console.log('Out of Loop Code: 001');
                   });
-                  console.log('Out of Loop Code: 002');
                 }
-                else {
-                  console.log('Else code 101');
-                }
-                console.log('Doing Creating Code: 003');
               });
-              console.log('Doing Creating Code: 004');
             }
-            else {
-              console.log('Else code 201');
-            }
-            console.log('Doing Creating Code: 005');
           });
-          console.log('Doing Creating Code: 006');
         }
-        else {
-          console.log('Else code 301');
-        }
-        console.log('Doing Creating Code: 007');
       });
   }
   });
-
-
-
-
-
-
-
-
-
-
-
-
-
-    // //Create the container details
-    // var hostAndNodeID = "node" + randomID;
-    // const containerDetails = {
-    //   Image: "6192.168.56.112_node1",
-    //   Hostname: hostAndNodeID,
-    //   NetworkingConfig: {
-    //     EndpointsConfig: {
-    //       // Need to change this Ashley
-    //       "6192.168.56.112_nodejs": {},
-    //     },
-    //   },
-    // };
-    // makeStartNewContainer(hostAndNodeID, containerDetails);
 }, 10000);
-
-
-// async function makeStartNewContainer(hostName, containerDetails) {
-//   try {
-//     console.log(`Attempting to start container: ${hostName}`);
-//     console.log("Creating container: " + hostName);
-
-//     await axios.post(`http://host.docker.internal:2375/containers/create?name=${hostName}`, containerDetails).then(function (response) { console.log(response) });
-//     console.log("Starting container: " + hostName);
-//     await axios.post(`http://host.docker.internal:2375/containers/${hostName}/start`);
-//   } catch (error) {
-//     console.log(error);
-//   }
-// }
-
-
-
-//import the request library
-var request = require('request');
-
-//This is the URL endopint of your vm running docker
-var url = 'http://192.168.56.112:2375';
-
-
-//this uses the simple get request from request
-//
-
-
-// function containerQty() {
-//   request.get({
-//     //we are using the /info url to get the base docker information
-//     url: url + "/info",
-//   }, (err, res, data) => {
-//     if (err) {
-//       console.log('Error:', err);
-//     } else if (res.statusCode !== 200) {
-//       console.log('Status:', res.statusCode);
-//     } else {
-//       //we need to parse the json response to access
-//       data = JSON.parse(data)
-//       console.log("Number of Containers = " + data.Containers);
-//     }
-//   });
-// }
-
-// containerQty();
-
-//create the post object to send to the docker api to create a container
-var create = {
-  uri: url + "/v1.40/containers/create",
-  method: 'POST',
-  //deploy an alpine container that runs echo hello world
-  json: { "Image": "alpine", "Cmd": ["echo", "hello world from LJMU cloud computing"] }
-};
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 // setInterval(function () {
 //   if (systemLeader == 1) {
 //     // TODO Ash: Come back to later
 //     if (dateNow.getHours() >= 16 && dateNow.getHours() <= 18) {
 //       //Scale up
+//Create a new Random nodeID (between 101 and 1000 - so not to get conflicts with the random ID that were being set).
+// let range = { min: 101, max: 1000 }
+// let delta = range.max - range.min
+// const randomID = Math.round(range.min + Math.random() * delta)
 //     } else if (dateNow.getHours() >= 18) {
 //       //Scale down
 //     }
