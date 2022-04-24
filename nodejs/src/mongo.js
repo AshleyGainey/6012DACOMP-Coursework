@@ -240,23 +240,25 @@ setInterval(function () {
     }
 
     if (systemLeader && deadNode != null) {
+      //Don't call this if statement until the dead node has been created by making deadNode to null.
       deadNode = null;
     //Create a new Random nodeID (between 101 and 1000 - so not to get conflicts with the random ID that were being set).
     let range = { min: 101, max: 1000 }
     let delta = range.max - range.min
     const randomID = Math.round(range.min + Math.random() * delta)
-
+      // var hello = "node" + randomID;
+      var hostName = '6012dacomp-coursework_' + individualNode.hostName + '_1';
     console.log('Need to restart container. Took more than 10 seconds');
       //send the create request
       request(create, function (error, response) {
         console.log('Doing Creating Code: 1');
         if (!error) {
           console.log('Doing Creating Code: 2');
-          console.log("Created container " + JSON.stringify(individualNode));
+          // console.log("Created container " + JSON.stringify(individualNode));
 
           //post object for the container start request
           var start = {
-            uri: url + "/v1.40/containers/" + deadNode.hostName + "/start",
+            uri: url + "/v1.40/containers/" + hostName + "/start",
             method: 'POST',
             json: {}
           };
@@ -270,7 +272,7 @@ setInterval(function () {
               console.log("Container start completed");
               //post object for  wait 
               var wait = {
-                uri: url + "/v1.40/containers/" + individualNode.hostName + "/wait",
+                uri: url + "/v1.40/containers/" + hostName + "/wait",
                 method: 'POST',
                 json: {}
               };
@@ -286,12 +288,24 @@ setInterval(function () {
 
                   //send a simple get request for stdout from the container
                   request.get({
-                    url: url + "/v1.40/containers/" + individualNode.hostName + "/logs?stdout=1",
+                    url: url + "/v1.40/containers/" + hostName + "/logs?stdout=1",
                   }, (err, res, data) => {
                     if (err) {
                       console.log('Doing Creating Code: 8');
                       console.log('Error:', err);
-                    } else if (res.statusCode !== 200) {
+                      //Didn't find container, create a new one.
+                    } else if (res.statusCode == 404) {
+                      console.log("Cannot restart container,It was not found.");
+                      console.log("Creating new container.");
+                      create = {
+                        uri: url + "/v1.40/containers/create",
+                        method: 'POST',
+                        //deploy an alpine container that runs my app.js code. Give it a new name.
+                        data: { "Image": "alpine", "Cmd": ["pm2-runtime", "--watch", "app.js"], "Name": individualNode.hostName }
+                      };
+                      // makeNewContainer();
+                    }
+                    else if (res.statusCode !== 200) {
                       console.log('Status:', res.statusCode);
                     } else {
                       //we need to parse the json response to access
