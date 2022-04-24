@@ -293,17 +293,6 @@ setInterval(function () {
                     if (err) {
                       console.log('Doing Creating Code: 8');
                       console.log('Error:', err);
-                      //Didn't find container, create a new one.
-                    } else if (res.statusCode == 404) {
-                      console.log("Cannot restart container,It was not found.");
-                      console.log("Creating new container.");
-                      create = {
-                        uri: url + "/v1.40/containers/create",
-                        method: 'POST',
-                        //deploy an alpine container that runs my app.js code. Give it a new name.
-                        data: { "Image": "alpine", "Cmd": ["pm2-runtime", "--watch", "app.js"], "Name": individualNode.hostName }
-                      };
-                      // makeNewContainer();
                     }
                     else if (res.statusCode !== 200) {
                       console.log('Status:', res.statusCode);
