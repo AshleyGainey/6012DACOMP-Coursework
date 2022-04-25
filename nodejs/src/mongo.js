@@ -20,6 +20,16 @@ var amqp = require('amqplib/callback_api');
 //Holds the nodes for each host
 var nodes = [];
 
+
+//leadership election
+let systemLeader = 0;
+
+//Used to see if the system scaled up yet
+var scaledUpYet = false;
+
+//Used to store the host Names of node 4 and node 5
+var node4HostName = null
+var node5HostName = null
 //instance of express and port to use for inbound connections.
 const app = express()
 const port = 3000
@@ -43,10 +53,12 @@ app.use(bodyParser.json());
 //connect to the cluster
 mongoose.connect(connectionString, {useNewUrlParser: true, useUnifiedTopology: true});
 
-
+//For mongoose to make a connection and if it fails, print out a message to the console
 var db = mongoose.connection;
 db.on('error', console.error.bind(console, 'MongoDB connection error:'));
 
+
+//Make a mongoose schema
 var Schema = mongoose.Schema;
 
 //Structure of the assignment schema
@@ -60,7 +72,7 @@ var notFlixSchema = new Schema({
   pointOfInteraction: String,
   typeOfInteraction: String
 });
-
+//Model that schema
 var notFlixModel = mongoose.model('Interactions', notFlixSchema, 'interactions');
 
 //Deal with the get request by sending back all of the information
@@ -102,14 +114,19 @@ nodes.push(nodeMessage);
 //Flag to see whether the first message has been sent (used for the election - had problems - see the section for more details)
 var firstMessageSentSuccessfully = false;
 
-//Publisher Code
+//Publisher Code - Every 2 seconds publish a message saying that the node is alive
 setInterval(function () {
   amqp.connect('amqp://user:bitnami@192.168.56.112', function (error0, connection) {
     console.log("Sending the alive message. Host Name:" + myhostname + " The Node ID:" + nodeID);
+    //If an error with RabbitMQ (e.g not started for example), don't continue and just show the error code
     if (error0) {
+      firstMessageSentSuccessfully = false;
       throw error0;
+    } else {
+      firstMessageSentSuccessfully = true;
     }
     connection.createChannel(function (error1, channel) {
+      //If an error while creating the channel, don't continue and just show the error code
       if (error1) {
         throw error1;
       }
@@ -134,13 +151,15 @@ setInterval(function () {
 }, 2000);
 
 
-//Subscriber Code
+//Subscriber Code - Receives messages that is coming from other nodes
 amqp.connect('amqp://user:bitnami@192.168.56.112', function (error0, connection) {
   console.log("In Subscriber part, awaiting for messages.");
+  //If an error with RabbitMQ (e.g not started for example), don't continue and just show the error code
   if (error0) {
     throw error0;
   }
   connection.createChannel(function (error1, channel) {
+    //If an error while creating the channel, don't continue and just show the error code
     if (error1) {
       throw error1;
     }
@@ -153,12 +172,14 @@ amqp.connect('amqp://user:bitnami@192.168.56.112', function (error0, connection)
     channel.assertQueue('', {
       exclusive: true
     }, function (error2, q) {
+      //If an error, don't continue and just show the error code
       if (error2) {
         throw error2;
       }
       console.log(" [*] Waiting for messages in %s. To exit press CTRL+C", q.queue);
       channel.bindQueue(q.queue, exchange, '');
 
+      //Consume the message has that been received by the node
       channel.consume(q.queue, function (msg) {
         if (msg.content) {
          //When published, the subscriber will print out what has been published
@@ -169,7 +190,7 @@ amqp.connect('amqp://user:bitnami@192.168.56.112', function (error0, connection)
           //Put the received message in a variable and parse it.
           var messageReceived = JSON.parse(msg.content.toString());
 
-          //Add/Replace information to the node (if already exists then replace, if not exist add to array)
+          //Add/Replace information to the node array (if already exists then replace the date (and if the node is not the same then replace the node)), if not exist add to array)
           if (nodes.some(node => node.hostName === messageReceived.hostName)) {
             var foundNode = nodes.find(foundNodeObject => foundNodeObject.hostName === messageReceived.hostName);
             foundNode.date = timeSentReceived;
@@ -177,19 +198,21 @@ amqp.connect('amqp://user:bitnami@192.168.56.112', function (error0, connection)
               foundNode.nodeID = messageReceived.nodeID;
             }
           } else {
+            //Add the information consumed to the node array
             nodes.push(messageReceived);
           }
-          //Has sent the first message so change the flag
-          firstMessageSentSuccessfully = true;
+          //RabbitMQ has sent the first message so change the flag
+          // firstMessageSentSuccessfully = true;
         } else {
           //If there is no content, then log to the console that no message was received.
           console.log('No Message')
         }
-        console.log("--------- Each node RESTART Start ----------")
+        //Print out all the nodes that are correctly in the nodes array (aka the nodes that are currently alive/or less than 10 seconds dead)
+        console.log("--------- Nodes array print out Start ----------")
         Object.entries(nodes).forEach(([hostname, prop]) => {
           console.log('hostname: ' + prop.hostName + ' prop nodeID : ' + prop.nodeID + ' prop status : ' + prop.status + ' prop date : ' + prop.date)
         });
-        console.log("--------- Each node RESTART End ----------")
+        console.log("--------- Nodes array print out  End ----------")
       }, {
         noAck: true
       });
@@ -197,10 +220,8 @@ amqp.connect('amqp://user:bitnami@192.168.56.112', function (error0, connection)
   });
 });
 
-//leadership election
-let systemLeader = 0;
-
 setInterval(function () {
+  //Store the MaxID in a variable
   var maxID = 0;
   // Nodes were saying they were the leader before even communicating to each other. 
   // So when first message with content has been received (RabbitMQ has done its job!) then elect a leader
@@ -229,6 +250,7 @@ var create = {
   json: { "Image": "alpine", "Cmd": ["echo", "Docker API have now created a new container!"] }
 };
 
+//Check to see if any node has died Section
 setInterval(function () {
   var deadNode = null;
   //Check to see if any node...
@@ -249,7 +271,7 @@ setInterval(function () {
       console.log(deadNode.hostName + " is dead and has been removed from the nodes array.");
     }
 
-    if (systemLeader && deadNode != null) {
+    if (systemLeader == 1 && deadNode != null) {
       //Don't call this if statement until the dead node has been created by making deadNode to null.
       deadNode = null;
 
@@ -263,18 +285,18 @@ setInterval(function () {
           //Has done all the sections in the nested calls.
           console.log("Created container " + JSON.stringify(individualNode));
 
-          //post object for the container start request
+          //Object for the starting of container request
           var start = {
             uri: url + "/v1.40/containers/" + fullHostName + "/start",
             method: 'POST',
             json: {}
           };
 
-          //send the start request
+          //Send the start request to start the container
           request(start, function (error, response) {
             if (!error) {
               console.log("Container start completed");
-              //post object for wait. Wait until the container has been created
+              //post object for wait. Wait until the container has been created first
               var wait = {
                 uri: url + "/v1.40/containers/" + fullHostName + "/wait",
                 method: 'POST',
@@ -283,7 +305,7 @@ setInterval(function () {
               request(wait, function (error, response, waitBody) {
                 if (!error) {
                   console.log("run wait complete, container will have started");
-                  //send a simple get request for stdout from the container
+                  //send a get request for stdout from the container
                   request.get({
                     url: url + "/v1.40/containers/" + fullHostName + "/logs?stdout=1",
                   }, (err, res, data) => {
@@ -306,17 +328,193 @@ setInterval(function () {
   }
   });
 }, 10000);
-// setInterval(function () {
-//   if (systemLeader == 1) {
-//     // TODO Ash: Come back to later
-//     if (dateNow.getHours() >= 16 && dateNow.getHours() <= 18) {
-//       //Scale up
-//Create a new Random nodeID (between 101 and 1000 - so not to get conflicts with the random ID that were being set).
-// let range = { min: 101, max: 1000 }
-// let delta = range.max - range.min
-// const randomID = Math.round(range.min + Math.random() * delta)
-//     } else if (dateNow.getHours() >= 18) {
-//       //Scale down
-//     }
-//   }
-// }, 5000)
+
+// Peak Hours section (check every 60 seconds)
+setInterval(function () {
+  //If it is the system leader then do this piece of code.
+  if (systemLeader == 1) {
+    //Get the current hour of now.
+    var currentHour = new Date().getHours();
+
+    // var currentHour = 17;
+    //The 3 current containers have 1-100. The two new containers will have an ID between 101-1000 so they don't have clash with the others
+    let range = { min: 101, max: 1000 };
+    let delta = range.max - range.min;
+
+
+    //scaledUpYet prevents this code from being executed twice and spinning up more than 2 containers
+    //If Current Hour is between 16:00 and 18:00
+    if (!scaledUpYet && currentHour > 16 && currentHour < 18) {
+      console.log("Peak hours has started. 2 New containers are being created and started");
+
+      //Scale up (code comes here Ashley)
+      var fullHostName4 = '6012dacomp-coursework_' + node4HostName + '_1';
+      var fullHostName5 = '6012dacomp-coursework_' + node4HostName + '_1';
+
+      create = {
+        uri: url + "/v1.40/containers/create",
+        method: 'POST',
+        data: { "Image": "alpine", "Cmd": ["pm2-runtime", "mongo.js"], "Name": fullHostName4 }
+      };
+
+      request(create, function (error, response) {
+        if (!error) {
+          //Has done all the sections in the nested calls.
+          // console.log("Created container " + JSON.stringify(individualNode));
+
+          //post object for the container start request
+          var start = {
+            uri: url + "/v1.40/containers/" + fullHostName4 + "/start",
+            method: 'POST',
+            json: {}
+          };
+
+          //send the start request
+          request(start, function (error, response) {
+            if (!error) {
+              console.log("Container start completed");
+              //post object for wait. Wait until the container has been created first
+              var wait = {
+                uri: url + "/v1.40/containers/" + fullHostName4 + "/wait",
+                method: 'POST',
+                json: {}
+              };
+              request(wait, function (error, response, waitBody) {
+                if (!error) {
+                  console.log("run wait complete, container will have started");
+                  //send a get request for stdout from the container
+                  request.get({
+                    url: url + "/v1.40/containers/" + fullHostName4 + "/logs?stdout=1",
+                  }, (err, res, data) => {
+                    if (err) {
+                      console.log('Error:', err);
+                    }
+                    else if (res.statusCode !== 200) {
+                      console.log('Status:', res.statusCode);
+                    } else {
+                      //we need to parse the json response to access
+                      console.log("Container stdout = " + data);
+                    }
+                  });
+                }
+              });
+            }
+          });
+        }
+      });
+
+      create = {
+        uri: url + "/v1.40/containers/create",
+        method: 'POST',
+        data: { "Image": "alpine", "Cmd": ["pm2-runtime", "mongo.js"], "Name": fullHostName5 }
+      };
+
+      request(create, function (error, response) {
+        if (!error) {
+          //Has done all the sections in the nested calls.
+          // console.log("Created container " + JSON.stringify(individualNode));
+
+          //post object for the container start request
+          var start = {
+            uri: url + "/v1.40/containers/" + fullHostName4 + "/start",
+            method: 'POST',
+            json: {}
+          };
+
+          //send the start request
+          request(start, function (error, response) {
+            if (!error) {
+              console.log("Container start completed");
+              //post object for wait. Wait until the container has been created
+              var wait = {
+                uri: url + "/v1.40/containers/" + fullHostName4 + "/wait",
+                method: 'POST',
+                json: {}
+              };
+              request(wait, function (error, response, waitBody) {
+                if (!error) {
+                  console.log("run wait complete, container will have started");
+                  //send a simple get request for stdout from the container first
+                  request.get({
+                    url: url + "/v1.40/containers/" + fullHostName4 + "/logs?stdout=1",
+                  }, (err, res, data) => {
+                    if (err) {
+                      console.log('Error:', err);
+                    }
+                    else if (res.statusCode !== 200) {
+                      console.log('Status:', res.statusCode);
+                    } else {
+                      //we need to parse the json response to access
+                      console.log("Container stdout = " + data);
+                    }
+                  });
+                }
+              });
+            }
+          });
+        }
+      });
+      //Has now been scaled up so set flag to true
+      scaledUpYet = true;
+    }
+    //If Current Hour is not between 16:00 and 18:00 and hasn't been scaled up yet.
+    if (!scaledUpYet && currentHour < 16 && currentHour > 18) {
+      node4HostName = Math.round(range.min + Math.random() * delta);
+      node5HostName = Math.round(range.min + Math.random() * delta);
+
+      console.log("Node4HostName:" + node4HostName);
+      console.log("Node5HostName:" + node5HostName);
+      if (node4HostName != null && node5HostName != null) {
+        console.log("Peak hours has ended. Killing the new containers we spun up before");
+        //Kill and remove the containers that have the hostname stored in node4HostName and node5HostName
+        //Scale Down(code comes here Ashley)
+
+         //Get the full Container name
+        var fullHostName4 = '6012dacomp-coursework_' + node4HostName + '_1';
+
+        //Make an object to stop the container
+        stopHostName4 = {
+          uri: url + "/v1.40/containers/" + node4HostName + "/stop",
+          method: 'POST'
+        };
+
+        // Do the request of stopping the container
+        request(stopHostName4, function (error, response, stop) {
+          if (error) {
+            //If error then display the error
+            console.log("Error while killing the container:" + node5HostName + " --- Status Code:" + response.statusCode);
+          } else {
+            //If no error, then display the success message
+            console.log("Killed the container:" + node4HostName);
+          }
+        });
+
+ //Get the full Container name
+        var fullHostName5 = '6012dacomp-coursework_' + node5HostName + '_1';
+
+        //Make an object to stop the container
+        stopHostName5 = {
+          uri: url + "/v1.40/containers/" + fullHostName5 + "/stop",
+          method: 'POST'
+        };
+
+         // Do the request of stopping the container
+        request(stopHostName5, function (error, response, stop) {
+          if (error) {
+            //If error then display the error
+            console.log("Error while killing the container:" + node5HostName + " --- Status Code:" + response.statusCode);
+          } else {
+                        //If no error, then display the success message
+            console.log("Killed the container:" + node5HostName);
+          }
+        });
+
+        //Set scaled up yet flag to false, as it has now been scaled up 
+        scaledUpYet = false;
+      } else {
+        //Got into the wrong state (should never happen but has been put in for debugging proposes)
+        console.log("Node4 and Node5 haven't been set and therefore cannot be scaled down.")
+      }
+    }
+  }
+}, 60000);
