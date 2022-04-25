@@ -4,25 +4,6 @@ GET http://192.168.56.108
 
 ### Sample Data below
 
-POST http://192.168.56.108:80 HTTP/1.1 
-content-type: application/json
-
-  { "_id": 1, "accountID": 1, "userName": "ashley.gainey", "titleID": 1, "userAction": "PlayButtonPress", "dateAndTime": "2022-01-12T13:34:00Z", "pointOfInteraction" : "2:59", "typeOfInteraction" : "Play"  }
-
-###
-
-POST http://192.168.56.108:80 HTTP/1.1 
-content-type: application/json 
-
-  { "_id": 2, "accountID": 2, "userName": "bradley.sour", "titleID": 2, "userAction": "MenuButtonPress", "dateAndTime": "2022-01-15T13:34:34Z", "pointOfInteraction" : "0:10", "typeOfInteraction" : "SubtitlesOff" }
-###
-
-POST http://192.168.56.108:80 HTTP/1.1 
-content-type: application/json 
-
-  { "_id": 3, "accountID": 3, "userName": "barney.old", "titleID": 3, "userAction": "FastForwardButtonPress",  "dateAndTime": "2022-01-15T12:34:52Z",  "pointOfInteraction" : "3:20", "typeOfInteraction" : "SkipEpisode" }
-
-  
 ###
 
 POST http://192.168.56.108:80 HTTP/1.1 
