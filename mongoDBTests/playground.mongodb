@@ -3,10 +3,10 @@
 use('notFlixDB');
 
 //Drop everything in the interaction instance
-db.Interactions.drop();
+db.interactions.drop();
 
 // Insert some fields into the interaction
-db.Interactions.insertMany([
+db.interactions.insertMany([
     { "_id": 1, "accountID": 1, "userName": "ashley.gainey", "titleID": 1, "userAction": "PlayButtonPress", "dateAndTime": "2022-01-12T13:34:00Z", "pointOfInteraction" : "2:59", "typeOfInteraction" : "Play"  },
     { "_id": 2, "accountID": 2, "userName": "bradley.sour", "titleID": 2, "userAction": "MenuButtonPress", "dateAndTime": "2022-01-15T13:34:34Z", "pointOfInteraction" : "0:10", "typeOfInteraction" : "SubtitlesOff" },
     { "_id": 3, "accountID": 3, "userName": "barney.old", "titleID": 3, "userAction": "FastForwardButtonPress",  "dateAndTime": "2022-01-15T12:34:52Z",  "pointOfInteraction" : "3:20", "typeOfInteraction" : "SkipEpisode" },
@@ -14,7 +14,7 @@ db.Interactions.insertMany([
 
 //Get the first 
 use('notFlixDB');
-db.getCollection('Interactions')
+db.getCollection('interactions')
  .find(
  {
  },
