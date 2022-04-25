@@ -75,6 +75,19 @@
 3) Open up the to the testData.http file in the mongoDBTests folder and Select 'Send Request' (will only show if the Rest Client extension is installed) on the queries to test the connection and whether you can addd and retreive data.
 
 
+--------OR-------
+
+If you are having issues connecting to the mongo cluster using vscode use the following steps to
+access the cluster directly.
+1) Start your cluster by running `sudo docker compose up`
+2) In a separate session list the running containers by executing `sudo docker container ls`
+3) Login to mongo server 1 (this is usually the primary) by doing the line `sudo docker container exec -ti CONTAINERID /bin/bash`
+4)  When connected to the container run mongo type `mongo`
+5)  It should show as PRIMARY if it is showing as SECONDARY exit and try one of the other containers. If it is not showing PRIMARY or SECONDRY then the cluster config has not been applied my the mongo setup node.
+6) You can then interact with the mongo cluster as normal (`show dbs` to show the notFlix interaction model).
+7) To use the database, enter `use notFlixDB`
+8) Then you can create collections, execute `show collections`
+
 
 
 ###  Broadcasting Publisher and Subscriber with the added Nodes to array - Communication between Nodes
